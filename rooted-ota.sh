@@ -530,11 +530,11 @@ function detectKsuKmi() {
   mkdir -p "$workDir"
 
   # 解包 boot.img 提取内核
-  .tmp/magiskboot unpack "$bootImg" -d "$workDir" >/dev/null 2>&1
+  .tmp/magiskboot unpack "$bootImg" -d "$workDir" >/dev/null 2>&1 || true
 
   local kernelFile="$workDir/kernel"
   if [ ! -f "$kernelFile" ]; then
-    printRed "无法从 boot.img 提取内核"
+    printRed "无法从 boot.img 提取内核（magiskboot 无法解包）" >&2
     rm -rf "$workDir"
     echo "unknown"
     return
@@ -546,7 +546,7 @@ function detectKsuKmi() {
   rm -rf "$workDir"
 
   if [ -z "$kernelVer" ]; then
-    printRed "无法从 boot.img 检测内核版本"
+    printRed "无法从 boot.img 检测内核版本" >&2
     echo "unknown"
     return
   fi
@@ -607,11 +607,18 @@ function injectKsuIntoOta() {
   if [ -z "$kmi" ]; then
     print "正在从 boot.img 自动检测 KMI..."
     kmi=$(detectKsuKmi "$workDir/extracted/boot.img")
-    if [ "$kmi" = "unknown" ]; then
-      printRed "KMI 自动检测失败。请手动设置 KSU_KMI 环境变量。"
-      exit 1
+    kmi=$(echo "$kmi" | tr -d '[:space:]')  # 清理可能的空白
+    if [ -z "$kmi" ] || [ "$kmi" = "unknown" ]; then
+      printYellow "KMI 自动检测失败，使用设备默认值"
+      case "$DEVICE_ID" in
+        shiba|husky|akita)  kmi="android14-6.1" ;;  # Pixel 8 系列
+        komodo|caiman)      kmi="android15-6.6" ;;  # Pixel 9 系列
+        *)                  kmi="android14-6.1" ;;  # 通用回退
+      esac
+      print "默认 KMI: $kmi"
+    else
+      printGreen "自动检测到 KMI: $kmi"
     fi
-    printGreen "自动检测到 KMI: $kmi"
   else
     print "使用已配置的 KMI: $kmi"
   fi
@@ -925,7 +932,15 @@ function printGreen() {
 
 function printRed() {
   if [[ -z "${NO_COLOR}" ]]; then
-   echo -e "\e[31m$(date '+%Y-%m-%d %H:%M:%S'): $*\e[0m"
+   echo -e "\e[31m$(date '+%Y-%m-%d %H:%M:%S'): $*\e[0m" >&2
+  else
+      print "$@" >&2
+  fi
+}
+
+function printYellow() {
+  if [[ -z "${NO_COLOR}" ]]; then
+    echo -e "\e[33m$(date '+%Y-%m-%d %H:%M:%S'): $*\e[0m"
   else
       print "$@"
   fi
