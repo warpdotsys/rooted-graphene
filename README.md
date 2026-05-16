@@ -1,13 +1,14 @@
 rooted-graphene
 ===
 
-使用 Magisk 修补 GrapheneOS OTA，支持 AVB 验证、锁定 Bootloader **和** Root 权限。  
+使用 KernelSU（或 Magisk）修补 GrapheneOS OTA，支持 AVB 验证、锁定 Bootloader **和** Root 权限。  
 可通过 [Custota](https://github.com/chenxiaolong/Custota) 和自建 OTA 服务器进行无线升级。  
-支持通过 OTA 在 Magisk root 和 rootless 之间切换。
+支持通过 OTA 在 KernelSU root、Magisk root 和 rootless 之间切换。
 
-> ⚠️ 系统和 root 基本正常工作。但 Zygisk 不支持（而且[大概率永远不会支持](https://github.com/topjohnwu/Magisk/pull/7606)），
+> ⚠️ **推荐使用 KernelSU**（而非 Magisk），因为它兼容性更好、不易被检测。
+> Magisk 的 Zygisk 不支持（而且[大概率永远不会支持](https://github.com/topjohnwu/Magisk/pull/7606)），
 > 导致 Magisk 容易被其他应用检测到，大量银行应用无法使用。
-> 参见[下方](#使用其他root方案)了解替代方案。
+> 参见[下方](#使用其他root方案)了解各方案的对比。
 
 ## 支持的设备
 
@@ -75,6 +76,8 @@ OTA 构建迁移到了独立的 GitHub 组织，以获得完整的 GitHub Action
 借此，可以重新支持[之前停更的设备](#2025030200)了 🥳。
 
 > ⚠️ 你需要在 Custota 应用中更新 OTA 服务器地址为  
+> https://warpdotsys.github.io/rooted-graphene/kernelsu（推荐，KernelSU root）  
+> 或  
 > https://warpdotsys.github.io/rooted-graphene/magisk  
 > 或  
 > https://warpdotsys.github.io/rooted-graphene/rootless
@@ -249,7 +252,10 @@ OTA 构建迁移到了独立的 GitHub 组织，以获得完整的 GitHub Action
 #### 设置 OTA 更新
 
 * 从设置 → 应用 → 查看所有应用 →（三点菜单）→ 显示系统 →（找到 "System Updater" 应用），[禁用系统更新应用](https://github.com/chenxiaolong/avbroot#ota-updates)（或阻止其网络访问）。
-* 打开 Custota 应用，设置 OTA 服务器地址为：https://warpdotsys.github.io/rooted-graphene/magisk
+* 打开 Custota 应用，设置 OTA 服务器地址为以下之一：
+  * **https://warpdotsys.github.io/rooted-graphene/kernelsu**（推荐，KernelSU root）
+  * https://warpdotsys.github.io/rooted-graphene/magisk（Magisk root）
+  * https://warpdotsys.github.io/rooted-graphene/rootless（无 root）
 
 或者你也可以通过 `adb sideload` 手动更新：
 * 重启设备，按住音量减键直到进入 bootloader 界面。
@@ -261,14 +267,16 @@ OTA 构建迁移到了独立的 GitHub 组织，以获得完整的 GitHub Action
 
 ## 在 root 和 rootless 之间切换
 
-要移除 root，可以切换到 "rootless" flavor。
+三个 flavor 可在 Custota 中随时切换：
 
-在 Custota 中设置以下 URL：https://warpdotsys.github.io/rooted-graphene/rootless
-然后升级。
-（如果 Custota 提示已是最新版本，可以长按 `Version` 然后选择 `Allow reinstall` 强制升级）。
+| 效果 | Custota URL |
+|------|------------|
+| **KernelSU root（推荐）** | https://warpdotsys.github.io/rooted-graphene/kernelsu |
+| Magisk root | https://warpdotsys.github.io/rooted-graphene/magisk |
+| 无 root | https://warpdotsys.github.io/rooted-graphene/rootless |
 
-如果要重新获得 root，只需将 Custota 中的 URL 改回：https://warpdotsys.github.io/rooted-graphene/magisk
-然后升级。
+在 Custota 中修改 URL 后升级即可。
+（如果 Custota 提示已是最新版本，长按 `Version` 然后选择 `Allow reinstall` 强制升级）。
 
 ## Magisk preinit 参数
 
