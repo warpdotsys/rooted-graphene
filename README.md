@@ -78,7 +78,7 @@ OTA 构建迁移到了独立的 GitHub 组织，以获得完整的 GitHub Action
 > ⚠️ 你需要在 Custota 应用中更新 OTA 服务器地址为  
 > https://warpdotsys.github.io/rooted-graphene/kernelsu （推荐，KernelSU root）  
 > 或  
-> https://warpdotsys.github.io/rooted-graphene/magisk
+> https://warpdotsys.github.io/rooted-graphene/magisk  
 > 或  
 > https://warpdotsys.github.io/rooted-graphene/rootless
 
