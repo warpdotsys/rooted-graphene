@@ -73,7 +73,7 @@ on:
         required: false
 jobs:
   build-device:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, docker]
     timeout-minutes: 20 # 避免某个命令卡住时浪费数小时
     steps:
       - uses: actions/checkout@v6
