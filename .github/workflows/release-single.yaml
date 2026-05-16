@@ -85,11 +85,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .tmp
-          # key 包含设备、版本和 flavor，保持跨运行缓存
-          # OTA 版本变化或 force-build 时失效
-          key: tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-${{ github.event.inputs.ota-version || inputs.ota-version || 'latest' }}-${{ github.run_id }}
+          # 用 OTA 版本作 key，构建成功后会持久化
+          # 版本更新时自动失效；force-build 时传自定义 ota-version 也可避免命中
+          key: tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-${{ github.event.inputs.ota-version || inputs.ota-version || 'latest' }}-${{ github.event.inputs.ksu-version || inputs.ksu-version || 'none' }}
           restore-keys: |
-            tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-${{ github.event.inputs.ota-version || inputs.ota-version || 'latest' }}-
             tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-
       - name: 预拉取 Docker 镜像
         run: |
