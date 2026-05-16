@@ -195,7 +195,7 @@ function createAndReleaseRootedOta() {
 function createRootedOta() {
   initDependencyVersions
   initToolCache
-  [[ "$SKIP_CLEANUP" != 'true' ]] && trap 'saveToolCache; cleanup' EXIT ERR
+  [[ "$SKIP_CLEANUP" != 'true' ]] && trap cleanup EXIT ERR
 
   findLatestVersion
   checkBuildNecessary
@@ -205,6 +205,7 @@ function createRootedOta() {
 
 function cleanup() {
   print "正在清理..."
+  saveToolCache
   rm -rf .tmp
   unset KEY_AVB_BASE64 KEY_OTA_BASE64 CERT_OTA_BASE64
   print "清理完成。"
