@@ -1,343 +1,338 @@
 rooted-graphene
 ===
 
-GrapheneOS over the air updates (OTAs) patched with Magisk allowing for AVB and locked bootloader *and* root access.  
-Can be upgraded over the air using [Custota](https://github.com/chenxiaolong/Custota) and its own OTA server.  
-Allows for switching between magisk and rootless via OTA upgrades.
+使用 Magisk 修补 GrapheneOS OTA，支持 AVB 验证、锁定 Bootloader **和** Root 权限。  
+可通过 [Custota](https://github.com/chenxiaolong/Custota) 和自建 OTA 服务器进行无线升级。  
+支持通过 OTA 在 Magisk root 和 rootless 之间切换。
 
-> ⚠️ OS and root work in general. However, zygisk does not (and [likely never will](https://github.com/topjohnwu/Magisk/pull/7606)) 
-> work, leading to magisk being easily discovered by other apps and lots of banking apps not working.  
- See [below](#using-other-rooting-mechanisms) for alternatives.
+> ⚠️ 系统和 root 基本正常工作。但 Zygisk 不支持（而且[大概率永远不会支持](https://github.com/topjohnwu/Magisk/pull/7606)），
+> 导致 Magisk 容易被其他应用检测到，大量银行应用无法使用。
+> 参见[下方](#使用其他root方案)了解替代方案。
 
-## Supported devices
+## 支持的设备
 
-See [.github/workflows/release-multiple.yaml](.github/workflows/release-multiple.yaml) in this repo.
+参见本仓库的 [.github/workflows/release-multiple.yaml](.github/workflows/release-multiple.yaml)。
 
-I plan to support as many devices as the GitHub Action limit allows for as long as this project is useful to me.
+在 GitHub Action 限制允许的范围内，我会尽量支持更多设备。
 
-If you would like to see more devices, add them via PR to the file mentioned above.  
-Alternatively, it's easy to [set up your own builds](#setting-up-your-own-ota-builds), which also makes you the owner of the signing keys.
+如果你想增加设备支持，请向上面的文件提交 PR。  
+或者，[自行搭建构建环境](#自行搭建ota构建)会更灵活——你还能拥有自己的签名密钥。
 
-If this project is useful to you, please consider **[donating to GrapheneOS](https://grapheneos.org/donate)**.  
-Please note that rooted-graphene is not an official GrapheneOS project.  
-As they do most of the heavy lifting, I think they deserve every support they can get.
+如果这个项目对你有帮助，请考虑 **[向 GrapheneOS 捐赠](https://grapheneos.org/donate)**。  
+注意 rooted-graphene 并非 GrapheneOS 官方项目。  
+GrapheneOS 团队承担了绝大部分工作，我认为他们值得获得一切支持。
 
-## Notable changelog
+## 重要更新日志
 
-These are only changes related to rooted-graphene, not GrapheneOS itself.  
-See [grapheneos.org/releases](https://grapheneos.org/releases) for that.
+以下仅列出 rooted-graphene 相关的变更，不包括 GrapheneOS 本身的更新。  
+GrapheneOS 更新日志请查看 [grapheneos.org/releases](https://grapheneos.org/releases)。
 
-### [#173](https://github.com/warpdotsys/rooted-graphene/pull/173), Sept 27, 2025
-Rooted-graphene opts-in to use the `stable-security-preview`.
+### [#173](https://github.com/schnatterer/rooted-graphene/pull/173)，2025 年 9 月 27 日
+Rooted-graphene 选择加入 `stable-security-preview` 频道。
 
-Basically, this gets us security fixes a lot faster at the cost of patches not being open source at the moment of release.
+这意味着安全修复可以更快推送，代价是发布时补丁源码不会立即公开。
 
-The fact that rooted-graphene is patched into the original OTA binaries and not built from source makes this possible.
-If you prefer staying with `stable` you can easily [set up your own builds](#setting-up-your-own-ota-builds) and set 
-`OTA_CHANNEL` to `stable`.
+由于 rooted-graphene 是在原始 OTA 二进制文件上修补而非从源码构建，这一点得以实现。
+如果你希望停留在 `stable` 频道，可以轻松[自行搭建构建环境](#自行搭建ota构建)，设置 `OTA_CHANNEL` 为 `stable`。
 
-More info: 
-> We're allowed to provide an early release with these patches and to list the CVEs but must wait until the embargo ends to publish sources or details on the patches.
-> The positive side is that we can now provide patches to people who truly need them without even the previous 1 month embargo delay.
+更多信息：
+> 我们可以提供包含这些补丁的早期发布版，并列出 CVE 编号，但在 embargo 结束前不能公开源码或补丁细节。
+> 积极的一面是，我们现在可以真正为有需要的人提供补丁，而无需等待之前长达 1 个月的 embargo 延迟。
 https://grapheneos.org/releases#2025092500
 
-> We do consider the security previews to be the normal and recommended choice.
+> 我们认为 security preview 是正常且推荐的选择。
 https://grapheneos.social/@GrapheneOS/115272851393143127
 
-### [#141](https://github.com/warpdotsys/rooted-graphene/pull/141), July 10, 2025
+### [#141](https://github.com/schnatterer/rooted-graphene/pull/141)，2025 年 7 月 10 日
 
-Upgrade to Custota 5.12, which contained a major regression where settings did not get migrated properly and got reset.
-Unfortunately, you will have to set the OTA URL again, to get the next update.
+升级到 Custota 5.12，但该版本存在重大回归：设置无法正确迁移，导致重置。
+你需要重新设置 OTA URL 才能获取下一次更新。
 
-[Fixed with Custota 5.13](https://github.com/chenxiaolong/Custota/blob/v5.13/CHANGELOG.md), 6dc6c4f on July 18, 2025.
+[在 Custota 5.13 中修复](https://github.com/chenxiaolong/Custota/blob/v5.13/CHANGELOG.md)，2025 年 7 月 18 日提交 6dc6c4f。
 
-> * Updating to this version will automatically restore the old settings without any manual intervention
-> * If noticed your settings get reset in 5.12 and already reconfigured the app, your new settings will not be touched.
+> * 升级到此版本会自动恢复旧设置，无需手动干预。
+> * 如果你发现设置已在 5.12 中重置并重新配置了应用，你的新设置不会被影响。
 
-### [#114](https://github.com/warpdotsys/rooted-graphene/pull/114), May 22, 2025
+### [#114](https://github.com/schnatterer/rooted-graphene/pull/114)，2025 年 5 月 22 日
 
-Upgrades to magisk 29. 
+升级到 Magisk 29。
 
-There seems to be a bug that can occur with magisk updates and avbroot.
+Magisk 更新配合 avbroot 可能会出现一个 Bug。
 
-[chenxiaolong/avbroot#455 (comment)](https://github.com/chenxiaolong/avbroot/issues/455#issuecomment-2955973508) 
+[chenxiaolong/avbroot#455（评论）](https://github.com/chenxiaolong/avbroot/issues/455#issuecomment-2955973508)
 
-contains some approaches to troubleshooting.
-This worked for me (at the expense of resetting Magisk's settings);
+包含了一些排查方法。
+以下方法对我有效（代价是会重置 Magisk 设置）：
 ```bash
 su -c 'rm -r /data/adb/magisk* && reboot'
 ```
 
-See also [rooted-graphene#5](https://github.com/rooted-graphene/ota/issues/5) (upstream).
+另见 [rooted-graphene#5](https://github.com/rooted-graphene/ota/issues/5)（上游）。
 
 ### 2025032500
 
-The OTA builds moved into a separate GitHub organization to get full GitHub action minutes budget.  
-With this, it is possible to add support for [devices discontinued lately](#2025030200) again 🥳.
+OTA 构建迁移到了独立的 GitHub 组织，以获得完整的 GitHub Action 分钟配额。  
+借此，可以重新支持[之前停更的设备](#2025030200)了 🥳。
 
-> ⚠️ You need to change the OTA server url in custota app to either  
+> ⚠️ 你需要在 Custota 应用中更新 OTA 服务器地址为  
 > https://warpdotsys.github.io/rooted-graphene/magisk  
-> or  
+> 或  
 > https://warpdotsys.github.io/rooted-graphene/rootless
 
-Note that the old upstream URLs will no longer receive new OTAs soon.
+注意旧的 OTA 服务器地址将不再接收新更新。
 
-Some more details:
-* A GitHub organization has 2000 free GitHub Action Minutes per month.
-* Each device build takes 10 Minutes.
-* There are about 4 stable releases per month.
-* The budget should last for the current devices and even provide room to support more 🥳  
+更多细节：
+* GitHub 组织每月有 2000 分钟免费 Action 额度。
+* 每台设备构建约需 10 分钟。
+* 每月约 4 次稳定版发布。
+* 当前配额足以覆盖现有设备，还有空间支持更多 🥳
 
 ### 2025030200
 
-* Discontinued some devices (Pixel 8 Pro (husky), Pixel 8 (shiba), Pixel 6a (bluejay)), because the amount of GitHub actions minutes required for 
-  maintaining that many devices exceed my spending limit.  
-  Please fork this repo and build your own OTAs (see [Supported Devices](#supported-devices)).  
+* 停更部分设备（Pixel 8 Pro (husky)、Pixel 8 (shiba)、Pixel 6a (bluejay)），因为维护太多设备所需的 Action 分钟数超出了我的使用额度。
+  请 fork 本仓库自行构建 OTA（参见[支持的设备](#支持的设备)）。
   ![image](https://github.com/user-attachments/assets/11cf8fe9-b846-4979-8d7c-723408681354)
-* Switch from custota signature file version 1 to 2 (introduced with [custota 5](https://github.com/chenxiaolong/Custota/blob/v5.0/CHANGELOG.md) in october 2024)
-* If you're using custoa magisk module version < 5, please upgrade.  
-  Even better: Delete custota magisk module, because it is now packaged in the OTA.
+* 从 custota 签名文件 v1 切换到 v2（由 [custota 5](https://github.com/chenxiaolong/Custota/blob/v5.0/CHANGELOG.md) 在 2024 年 10 月引入）。
+* 如果你还在使用 custota Magisk 模块版本 < 5，请升级。
+  更好的做法：直接删除 custota Magisk 模块，因为它现在已内置于 OTA 中。
 
 ### 2025021100
-* Start shipping custota app with OTA
-* This allows for OTA updates even when rootless and relieves you of the burden to keep the magisk module up to date.  
-  Starting with the next version, this will allow you to switch root and off by installing OTA updates!
-* In the `-magisk` flavor of rooted-graphene, the custota magisk module should be automatically disabled 
-  on start. You can safely remove it. Custota is now a system app.
-* In the `-rootless` flavor the custota should be new, so no problems.  
-  Except when you had it installed as magisk module before (using the `-magisk` flavor).  
-  Then you should `adb sideload` the  `-magisk` first. Then custota should work as a system app.
-  Then you should be able to switch to `-rootless` with custota working.
-  Here are some troubleshooting tipps.
-  * test, if an upgrading works by long pressing `Version` in custota and then selecting `Allow reinstall`.  
-    This way you can also switch from `-magisk` to `-rootless` (and back if everything works as planned).
-  * you might have to change ownership or delete these files:
+* 开始随 OTA 内置 Custota 应用。
+* 即使 rootless 也能 OTA 更新，无需你再手动维护 Magisk 模块。
+  从下一版本起，你可以通过安装 OTA 更新来切换 root 和 rootless！
+* 在 rooted-graphene 的 `-magisk` flavor 中，custota Magisk 模块会在启动时自动禁用。
+  你可以安全地删除它。Custota 现在是一个系统应用。
+* 在 `-rootless` flavor 中，Custota 是全新安装的，因此没有问题。
+  除非你之前在 `-magisk` flavor 中已将 Custota 安装为 Magisk 模块。
+  那么你应该先通过 `adb sideload` 安装 `-magisk` 版本，Custota 才能作为系统应用正常工作。
+  之后你应该能切换到 `-rootless` 并使用 Custota。
+  以下是一些故障排除技巧：
+  * 长按 Custota 中的 `Version` 然后选择 `Allow reinstall`，可以测试升级是否正常。
+    这样你也可以在 `-magisk` 和 `-rootless` 之间来回切换（只要一切正常运行）。
+  * 你可能需要修改所有权或删除以下文件：
     * `/sdcard/Android/data/com.chiller3.custota/`
     * `/data/ota_packagecare_map.pb`
-  * If you no longer have root, you can always delete modules using `adb`, see [#82](https://github.com/warpdotsys/rooted-graphene/issues/82).
+  * 如果你失去了 root 权限，可以随时通过 `adb` 删除模块，参见 [#82](https://github.com/schnatterer/rooted-graphene/issues/82)。
 
-## Initial installation of OS
+## 首次安装系统
 
-### Hints 
-* Make sure the versions of the unpatched version initially installed and the one taken from this repo match.
-* You might want to start with the version before the latest to try if OTA is working before initializing your device.
-* Don't mix up **factory image** and OTA
-* The following steps are basically the ones described at [avbroot](https://github.com/chenxiaolong/avbroot#initial-setup)
-  using the `avb_pkmd.bin` from [this repo](https://github.com/warpdotsys/rooted-graphene/).
+### 提示
+* 确保首次安装的未修补版本与你从本仓库下载的版本一致。
+* 建议先尝试安装上一个版本，确认 OTA 工作正常后再初始化你的设备。
+* 不要混淆 **factory image** 和 OTA。
+* 以下步骤基本来自 [avbroot 文档](https://github.com/chenxiaolong/avbroot#initial-setup)，
+  使用[本仓库](https://github.com/warpdotsys/rooted-graphene/)的 `avb_pkmd.bin`。
 
-### Installation
+### 安装
 
-⚠️ Please be aware that there is always some risk involved when flashing your device.  
-Especially since the first `Device is corrupt. It can't be trusted` messages started appearing in [2025032500](https://github.com/warpdotsys/rooted-graphene/issues/89).  
-In relation to this error,
-we heard [multiple](https://github.com/warpdotsys/rooted-graphene/issues/96#issuecomment-3123443894) [reports](https://github.com/warpdotsys/rooted-graphene/issues/96#issuecomment-3358048965) about hard bricks.  
-The steps listed below should work around this issue, though.
+⚠️ 刷写设备始终存在一定风险。  
+尤其是自 [2025032500](https://github.com/schnatterer/rooted-graphene/issues/89) 首次出现 `Device is corrupt. It can't be trusted` 消息以来。  
+关于此错误，我们听到了[多起](https://github.com/schnatterer/rooted-graphene/issues/96#issuecomment-3123443894)[变砖报告](https://github.com/schnatterer/rooted-graphene/issues/96#issuecomment-3358048965)。  
+以下步骤应该可以规避此问题。
 
-Still, if flashing fails, [**don't switch the slot**](https://github.com/warpdotsys/rooted-graphene/issues/96#issuecomment-3128121844).  
-Read through the comments on [this issue](https://github.com/warpdotsys/rooted-graphene/issues/96) or reach out for help.  
-In case your device should refuse to boot, [this project](https://github.com/JoshuaDoes/tensor-usbdl/) might be helpful. 
+另外，如果刷写失败，**[不要切换插槽](https://github.com/schnatterer/rooted-graphene/issues/96#issuecomment-3128121844)**。  
+仔细阅读[这个 issue](https://github.com/schnatterer/rooted-graphene/issues/96) 中的评论，或寻求帮助。  
+如果你的设备无法启动，[这个项目](https://github.com/JoshuaDoes/tensor-usbdl/)可能会有所帮助。
 
-Be careful!
-I only provide this software.
-You are using it at your own risk.
+请小心！
+我只是提供软件。
+你使用它需自行承担风险。
 
-#### Install GrapheneOS
+#### 安装 GrapheneOS
 
-##### Web Installer
+##### 网页安装器
 
-Using the web installer is easier, but will always install the latest version. 
-So it's not possible to verify if OTA upgrades work right away.
+网页安装器更简单，但总是安装最新版本。
+因此无法立即验证 OTA 升级是否正常工作。
 
-Use the [web installer](https://grapheneos.org/install/web) to install GrapheneOS:
-* Write down the installed version, e.g. `Downloaded caiman-install-2024123000.zip release`.
-* Stop at `Locking the bootloader` and close the browser. 
-  We'll lock the bootloader later!
+使用[网页安装器](https://grapheneos.org/install/web)安装 GrapheneOS：
+* 记下安装的版本号，例如 `Downloaded caiman-install-2024123000.zip release`。
+* 在 `Locking the bootloader` 处停下并关闭浏览器。
+  稍后我们会锁定 bootloader！
 
-##### Manual install
+##### 手动安装
 
-Alternative method to Web installer.
+网页安装器的替代方法。
 
-Download [**factory image**](https://grapheneos.org/releases) and follow the [official instructions](https://grapheneos.org/install/cli)  to install GrapheneOS.
+下载 [**factory image**](https://grapheneos.org/releases) 并按照[官方说明](https://grapheneos.org/install/cli)安装 GrapheneOS。
 
-**When downloading the "Install zip", change the last digit in the URL from `0` to `1`!**
+**下载 "Install zip" 时，将 URL 的最后一位数字从 `0` 改为 `1`！**
 
-This way you get the [security-preview version](#173-sept-27-2025) right away and won't have to switch after installation.
+这样你就能直接获得 [security-preview 版本](#173-2025-年-9-月-27-日)，安装后无需切换。
 
-e.g. from `https://releases.grapheneos.org/tegu-install-2025122500.zip`  
-to `https://releases.grapheneos.org/tegu-install-2025122501.zip`
+例如从 `https://releases.grapheneos.org/tegu-install-2025122500.zip`  
+改为 `https://releases.grapheneos.org/tegu-install-2025122501.zip`
 
-TLDR:
+快速指南：
 
-* Enable OEM unlocking
-* Obtain latest `fastboot`
-* Unlock Bootloader:
-  Enable usb debugging and execute `adb reboot bootloader`, or
-  > The easiest approach is to reboot the device and begin holding the volume down button until it boots up into the bootloader interface.
+* 启用 OEM 解锁
+* 获取最新 `fastboot`
+* 解锁 Bootloader：
+  启用 USB 调试并执行 `adb reboot bootloader`，或者
+  > 最简单的方法是重启设备，然后按住音量减键直到启动进入 bootloader 界面。
    ```shell
    fastboot flashing unlock
    ```
-* flash factory image
+* 刷入 factory image
 
   ```shell
-  bsdtar xvf DEVICE_NAME-factory-VERSION.zip # tar on windows and mac
-  ./flash-all.sh # or .bat on windows
+  bsdtar xvf DEVICE_NAME-factory-VERSION.zip # Windows 和 Mac 上用 tar
+  ./flash-all.sh # Windows 上用 .bat
   ````
-* Stop after that and reboot (leave bootloader unlocked)
+* 完成后重启（保持 bootloader 解锁状态）
 
-#### Patch GrapheneOS with OTAs from this image
+#### 使用本仓库的 OTA 修补 GrapheneOS
 
-Once GrapheneOS is installed
+安装 GrapheneOS 后
 
-* Download the [OTA from releases](https://github.com/warpdotsys/rooted-graphene/releases) with **the same version** (except `00` at the end is `01`, see [security-preview](#173-sept-27-2025)) that you just installed. 
-* Obtain latest `fastboot`
-* Install [avbroot](https://github.com/chenxiaolong/avbroot)
-* Extract the partition images from the patched OTA that are different from the original.
+* 从 [releases 页面](https://github.com/warpdotsys/rooted-graphene/releases)下载与已安装版本**相同**的 OTA（末尾 `00` 改为 `01`，参见 [security-preview](#173-2025-年-9-月-27-日)）。
+* 获取最新 `fastboot`
+* 安装 [avbroot](https://github.com/chenxiaolong/avbroot)
+* 从修补后的 OTA 中提取与原版不同的分区镜像。
     ```bash
     avbroot ota extract \
         --input /path/to/ota.zip.patched \
         --directory extracted \
         --fastboot
     ```
-* Set this environment variable to match the extracted folder:
+* 设置环境变量指向提取目录：
 
-  For Linux/macOS:
+  Linux/macOS：
   ```bash
   export ANDROID_PRODUCT_OUT=extracted
   ```
 
-  For Windows (powershell):
+  Windows（powershell）：
   ```powershell
   $env:ANDROID_PRODUCT_OUT = "extracted"
   ```
-  or (bat):
+  或（bat）：
   ```bat
   set ANDROID_PRODUCT_OUT=extracted
   ```
 
-* Flash the partitions using the command:
+* 使用以下命令刷写分区：
   ```bash
   fastboot flashall --skip-reboot
   ```
-* Set up the custom AVB public key in the bootloader.
+* 在 bootloader 中设置自定义 AVB 公钥。
     ```bash
     fastboot reboot-bootloader
     fastboot erase avb_custom_key
     fastboot flash avb_custom_key avb_pkmd.bin
     ```
-* Sideload the OTA  
-  (to avoid `Device is corrupt. It can't be trusted` error)
-   1. Run `fastboot reboot recovery` to get into recovery mode
-   2. You should see an android icon lying down with the text "No command".  
-      Hold the power button and press the volume up button a single time to get into the recovery GUI
-   3. Use volume buttons to navigate to "Apply update from ADB" and select it with the power button
-   4. Like the recovery prompt says, use  
+* Sideload OTA  
+  （避免 `Device is corrupt. It can't be trusted` 错误）
+   1. 运行 `fastboot reboot recovery` 进入 recovery 模式。
+   2. 你会看到 Android 图标躺倒并显示 "No command"。
+      按住电源键，再按一次音量上键，进入 recovery GUI。
+   3. 用音量键导航到 "Apply update from ADB"，按电源键确认。
+   4. 按照 recovery 提示，使用  
       `adb sideload <path to ota zip>`  
-       to sideload the OTA
-   5. After sideloading, select reboot to bootloader
-* If you installed using the web installer (or installed manually without security-preview) start the device and switch to the security-preview version during the startup wizard.  
-  Then return to the bootloader (e.g. by using the volume button).  
-  See [anouncement](#173-sept-27-2025) and [#202](https://github.com/warpdotsys/rooted-graphene/issues/202#issuecomment-3620623595) for details.  
-* Lock the bootloader using the following command.
-  This will trigger a data wipe again.
+       sideload OTA。
+   5. Sideload 完成后，选择重启到 bootloader。
+* 如果你使用网页安装器（或手动安装时未使用 security-preview），启动设备后在开机向导中切换到 security-preview 版本。
+  然后返回 bootloader（例如使用音量键）。
+  参见[公告](#173-2025-年-9-月-27-日)和 [#202](https://github.com/schnatterer/rooted-graphene/issues/202#issuecomment-3620623595) 了解详情。
+* 使用以下命令锁定 bootloader。
+  这会再次清除数据。
     ```bash
     fastboot flashing lock
     ```
-* Confirm by pressing volume down and then power. Then reboot.
-* Remember: **Do not uncheck `OEM unlocking`!** (to avoid [hard-bricking](https://github.com/chenxiaolong/avbroot/blob/v3.12.0/README.md#warnings-and-caveats))  
-  That is, in Graphene's startup wizard, leave this box unticked 👇️  
-  <img src="https://github.com/schnatterer/rooted-graphene/assets/1824962/6ef90b46-2070-4d08-80d4-5f4a0e749cbe" width="216" height="480" alt="Screenshot of GrapheneOS recommending to lock">  
-  Note: The OTA contains [OEMUnlockOnBoot](https://github.com/chenxiaolong/OEMUnlockOnBoot), so OEM locking should be impossible.  
-  Still, better safe than sorry, keep it unlocked.
+* 按音量减键，再按电源键确认。然后重启。
+* 记住：**不要取消勾选 `OEM unlocking`！**（避免[变砖](https://github.com/chenxiaolong/avbroot/blob/v3.12.0/README.md#warnings-and-caveats)）
+  即在 Graphene 的开机向导中，保持此框未勾选 👇️
+  <img src="https://github.com/schnatterer/rooted-graphene/assets/1824962/6ef90b46-2070-4d08-80d4-5f4a0e749cbe" width="216" height="480" alt="GrapheneOS 建议锁定截图">
+  注意：OTA 包含 [OEMUnlockOnBoot](https://github.com/chenxiaolong/OEMUnlockOnBoot)，因此 OEM 锁定应该不可能。
+  不过，安全第一，保持解锁。
 
-#### Set up OTA updates
+#### 设置 OTA 更新
 
-* [Disable System Updater app](https://github.com/chenxiaolong/avbroot#ota-updates) (or block its network access) from Settings -> Apps -> See all apps -> (three-dot menu) -> Show system -> (find "System Updater" app).
-* Open Custota app and set the OTA server URL to point to this OTA server: https://warpdotsys.github.io/rooted-graphene/magisk
+* 从设置 → 应用 → 查看所有应用 →（三点菜单）→ 显示系统 →（找到 "System Updater" 应用），[禁用系统更新应用](https://github.com/chenxiaolong/avbroot#ota-updates)（或阻止其网络访问）。
+* 打开 Custota 应用，设置 OTA 服务器地址为：https://warpdotsys.github.io/rooted-graphene/magisk
 
-Alternatively you could do updates manually via `adb sideload`:
-* reboot the device and begin holding the volume down button until it boots up into the bootloader interface
-* using volume buttons, toggle to recovery. Confirm by pressing power button
-* If the screen is stuck at a `No command` message, press the volume up button once while holding down the power button.
-* using volume buttons, toggle to `Apply update from ADB`. Confirm by pressing power button
-* `adb sideload xyz.zip`
-* See also [here](https://github.com/chenxiaolong/avbroot#updates).
+或者你也可以通过 `adb sideload` 手动更新：
+* 重启设备，按住音量减键直到进入 bootloader 界面。
+* 用音量键切换到 recovery，按电源键确认。
+* 如果屏幕卡在 `No command` 界面，按住电源键的同时按一次音量上键。
+* 用音量键切换到 `Apply update from ADB`，按电源键确认。
+* `adb sideload xyz.zip`。
+* 另见[这里](https://github.com/chenxiaolong/avbroot#updates)。
 
-## Switching between root and rootless
+## 在 root 和 rootless 之间切换
 
-To remove root, you can change to the "rootless" flavor.
+要移除 root，可以切换到 "rootless" flavor。
 
-To do so, set the following URL in custota: https://warpdotsys.github.io/rooted-graphene/rootless
-And then upgrade.  
-(if custota should tell you that you're on the latest version, you can force an upgrade by long pressing `Version` and 
-then selecting `Allow reinstall`).
+在 Custota 中设置以下 URL：https://warpdotsys.github.io/rooted-graphene/rootless
+然后升级。
+（如果 Custota 提示已是最新版本，可以长按 `Version` 然后选择 `Allow reinstall` 强制升级）。
 
-If you want to gain root again, just switch back to this URL in custota: https://warpdotsys.github.io/rooted-graphene/magisk
-And then upgrade.
+如果要重新获得 root，只需将 Custota 中的 URL 改回：https://warpdotsys.github.io/rooted-graphene/magisk
+然后升级。
 
-## Magisk preinit strings
+## Magisk preinit 参数
 
-See [.github/workflows/release-multiple.yaml](.github/workflows/release-multiple.yaml) for examples.
+参见 [.github/workflows/release-multiple.yaml](.github/workflows/release-multiple.yaml) 中的示例。
 
-How to extract:
+如何提取：
 
-* Get boot.img either from factory image or from OTA via
+* 从 factory image 或 OTA 中获取 boot.img：
   ```shell
      avbroot ota extract \
      --input /path/to/ota.zip \
      --directory . \
      --boot-only
   ```
-* Install magisk, patch boot.img, look for this string in the output:  
+* 安装 Magisk，修补 boot.img，在输出中找到：  
   `Pre-init storage partition device ID: <name>`
-* Alternatively, extract from the patched boot.img: 
+* 或者，从修补后的 boot.img 中提取：
   ```shell
   avbroot boot magisk-info \
   --image magisk_patched-*.img
   ```
-* See also: https://github.com/chenxiaolong/avbroot/blob/master/README.md#magisk-preinit-device
+* 另见：https://github.com/chenxiaolong/avbroot/blob/master/README.md#magisk-preinit-device
 
-## Setting up your own OTA builds
+## 自行搭建 OTA 构建
 
-* Create your own keys `bash -c 'source rooted-ota.sh && generateKeys'` and store them in a dry and safe place.
-* Uncomment or add your device(s) in `.github/workflows/release-multiple.yaml`
-  See [Magisk preinit string](#magisk-preinit-strings).
+* 生成自己的密钥 `bash -c 'source rooted-ota.sh && generateKeys'`，存放在干燥安全的地方。
+* 取消注释或添加你的设备到 `.github/workflows/release-multiple.yaml`
+  参见 [Magisk preinit 参数](#magisk-preinit-参数)。
 
-This sets up a cron job that builds the latest version of GrapheneOS, nightly.
+这将设置一个 cron 任务，每晚自动构建最新版 GrapheneOS。
 
-This way, you won't have too many maintenance efforts but own your own signing key!  
-You can also add a 3rd-party-magisk package if you're willing to trust the authors
-(see [Using other rooting mechanisms](#using-other-rooting-mechanisms)).
+这样你无需太多维护工作，就能拥有自己的签名密钥！
+如果你信任第三方 Magisk 包的作者，也可以添加（参见[使用其他 root 方案](#使用其他-root-方案)）。
 
-Alternatively, search the forks if someone maintains the device of your choice.    
-Be aware that you would also have to trust them in addition to [me](https://github.com/schnatterer), [chenxiaolong](https://github.com/chenxiaolong) (the author of avbroot and Custota),
-the authors of magisk, the authors of GrapheneOS, and the authors of the android open source project.
+或者，搜索其他人维护的 fork 中是否有你想要的设备。
+但请注意，除了信任[我](https://github.com/schnatterer)、[chenxiaolong](https://github.com/chenxiaolong)（avbroot 和 Custota 的作者）、
+Magisk 的作者、GrapheneOS 的作者以及 Android 开源项目的作者之外，你还需要信任 fork 的维护者。
 
-## Script
+## 脚本
 
-You can use the `rooted-ota.sh` script in this repo to create your own OTAs and run your own OTA server.
+你可以使用本仓库的 `rooted-ota.sh` 脚本自行创建 OTA 并运行自己的 OTA 服务器。
 
-### Only create patched OTAs
+### 仅创建修补后的 OTA
 
 ```shell
-# Generate keys
+# 生成密钥
 bash -c 'source rooted-ota.sh && generateKeys'
 
-# Enter passphrases interactively
+# 交互式输入密码
 DEVICE_ID=oriole MAGISK_PREINIT_DEVICE='metadata' bash -c '. rooted-ota.sh && createRootedOta'  
  
-# Enter passphrases via env (e.g. on CI)
+# 通过环境变量输入密码（例如 CI 环境）
   export PASSPHRASE_AVB=1
   export PASSPHRASE_OTA=1 
 DEVICE_ID=oriole MAGISK_PREINIT_DEVICE='metadata' bash -c '. rooted-ota.sh && createRootedOta' 
 ```
 
-For IDs see [grapheneos.org/releases](https://grapheneos.org/releases). For Magisk preinit see,e.g. [here](#magisk-preinit-strings).
+设备 ID 参见 [grapheneos.org/releases](https://grapheneos.org/releases)。Magisk preinit 参见[这里](#magisk-preinit-参数)。
 
-### Upload patched OTAs as GH release and provide OTA server via GH pages
+### 将修补后的 OTA 上传为 GitHub Release 并通过 GH Pages 提供 OTA 服务器
 
-See GitHub actions for automating this:
-* [release single device](.github/workflows/release-single.yaml)
-* [release multiple devices](.github/workflows/release-multiple.yaml) regularly (using cron)
+使用 GitHub Actions 自动化：
+* [单设备发布](.github/workflows/release-single.yaml)
+* [多设备定时发布](.github/workflows/release-multiple.yaml)（使用 cron）
 
 ```shell
 GITHUB_TOKEN=gh... \
@@ -347,34 +342,34 @@ MAGISK_PREINIT_DEVICE=metadata \
 bash -c '. rooted-ota.sh && createAndReleaseRootedOta'
 ```
 
-### Using other rooting mechanisms
+### 使用其他 root 方案
 
-As [magisk does not seem a perfect match for GrapheneOS](https://github.com/topjohnwu/Magisk/pull/7606), you might be looking for alternatives.
+由于 [Magisk 似乎与 GrapheneOS 并不完美契合](https://github.com/topjohnwu/Magisk/pull/7606)，你可能在寻找替代方案。
 
 #### KernelSU
 
-This repo supports building OTAs with [KernelSU](https://kernelsu.org/) root instead of Magisk.
+本仓库支持使用 [KernelSU](https://kernelsu.org/) 代替 Magisk 构建 OTA。
 
-> ⚠️ **Previous attempts at KernelSU support** saw the device boot but root was not granted. This was likely due to:
-> - Using the wrong [KMI](https://kernelsu.org/guide/installation.html#kmi) for the device's kernel
-> - An older, incompatible version of the KernelSU tools
-> 
-> The current implementation addresses these issues by:
-> - **Auto-detecting the KMI** from the boot.img's kernel version
-> - Using **ksud v3.2.1** (last version with pre-built Linux CLI) with the **latest `.ko` modules**
-> - Applying the patch via avbroot's `--prepatched` option for proper signing
+> ⚠️ **以前的 KernelSU 尝试**导致设备能启动但 root 未授予。这可能是由于：
+> - 使用了错误的设备内核 [KMI](https://kernelsu.org/guide/installation.html#kmi)
+> - 使用了较旧且不兼容的 KernelSU 工具版本
+>
+> 当前实现通过以下方式解决这些问题：
+> - **自动检测 KMI**：从 boot.img 的内核版本自动识别
+> - 使用 **ksud v3.2.1**（最后一个有 Linux 预编译二进制的版本）配合 **最新的 `.ko` 模块**
+> - 通过 avbroot 的 `--prepatched` 选项正确签名
 
-To build a KSU-patched OTA, set the `KSU_VERSION` environment variable:
+要构建 KSU 修补的 OTA，设置 `KSU_VERSION` 环境变量：
 
 ```shell
-# Build with KernelSU (KMI auto-detected from boot.img)
+# 使用 KernelSU 构建（KMI 从 boot.img 自动检测）
   export PASSPHRASE_AVB=1 PASSPHRASE_OTA=1
 DEVICE_ID=shiba \
 KSU_VERSION=v3.2.4 \
 MAGISK_PREINIT_DEVICE=sda10 \
 bash -c '. rooted-ota.sh && createRootedOta'
 
-# Force a specific KMI (skip auto-detection)
+# 强制指定 KMI（跳过自动检测）
 DEVICE_ID=shiba \
 KSU_VERSION=v3.2.4 \
 KSU_KMI=android14-6.1 \
@@ -382,54 +377,54 @@ MAGISK_PREINIT_DEVICE=sda10 \
 bash -c '. rooted-ota.sh && createRootedOta'
 ```
 
-Notes:
-- **KSU requires rootless OTA** as base (rootless is built first, then KSU is injected as a post-processing step)
-- The `KSU_KMI` env var can be used to manually specify the KMI; if unset, it's auto-detected from the boot.img
-- Set `KSU_ALLOW_SHELL=false` to disable shell root access
+注意：
+- **KSU 需要 rootless OTA 作为基础**（先构建 rootless，然后通过后处理注入 KSU）
+- `KSU_KMI` 环境变量可用于手动指定 KMI；未设置时从 boot.img 自动检测
+- 设置 `KSU_ALLOW_SHELL=false` 可禁用 shell root 访问
 
-#### Other alternatives
+#### 其他替代方案
 
-Another alternative might be to use a version of magisk (like [the one maintained by pixincreate](https://github.com/pixincreate/Magisk)) that contains patches to make zygisk work.  
-This still has some limitations, like [certain modules checking for magisk's signature won't work](https://github.com/warpdotsys/rooted-graphene/commit/da0cd817c2665798df46df1aeb7caef9d98b79d0#r141746606).
+另一种选择是使用包含 Zygisk 补丁的 Magisk 变体（例如 [pixincreate 维护的版本](https://github.com/pixincreate/Magisk)）。
+但仍有一些限制，比如[某些模块检查 Magisk 签名会失败](https://github.com/schnatterer/rooted-graphene/commit/da0cd817c2665798df46df1aeb7caef9d98b79d0#r141746606)。
 
-Another option [might be](https://github.com/warpdotsys/rooted-graphene/pull/73#issuecomment-2666870886) Kitsune magisk.
+另一个选择[可能是](https://github.com/schnatterer/rooted-graphene/pull/73#issuecomment-2666870886) Kitsune Magisk。
 
-In general, using [magisk and especially zygisk with Graphene seems to have the risk of breaking things with every new release](https://github.com/chenxiaolong/avbroot/issues/213#issuecomment-1986637884).  
-It's good to have the rootless version as a fallback!
+总的来说，在 GrapheneOS 上使用 [Magisk（尤其是 Zygisk）似乎每次更新都有翻车的风险](https://github.com/chenxiaolong/avbroot/issues/213#issuecomment-1986637884)。
+留着 rootless 版本作为备胎总是好的！
 
-## Development
+## 开发
 ```bash
-# DEBUG some parts of the script interactively
+# 交互式调试脚本部分功能
 DEBUG=1 bash --init-file rooted-ota.sh
-# Test loading secrets from env
+# 测试从环境变量加载密钥
 PASSPHRASE_AVB=1 PASSPHRASE_OTA=1 bash -c '. rooted-ota.sh && key2base64 && KEY_AVB=doesnotexist createAndReleaseRootedOta'        
 
-# Avoid having to download OTA all over again: SKIP_CLEANUP=true or:
+# 避免重复下载 OTA：SKIP_CLEANUP=true 或：
 mkdir -p .tmp && ln -s $PWD/shiba-ota_update-2023121200.zip .tmp/shiba-ota_update-2023121200.zip
 
-# Test only patching
+# 仅测试修补
   export PASSPHRASE_AVB=x PASSPHRASE_OTA=y
 SKIP_CLEANUP=true DEVICE_ID=oriole MAGISK_PREINIT_DEVICE='metadata' bash -c '. rooted-ota.sh && createRootedOta'
 
-# Test patching kernelsu
+# 测试 KernelSU 修补
   export PASSPHRASE_AVB=x PASSPHRASE_OTA=y
 SKIP_CLEANUP=true DEVICE_ID=shiba MAGISK_PREINIT_DEVICE=sda10 KSU_VERSION=v3.2.4 bash -c '. rooted-ota.sh && createRootedOta'
 
-# Test only releasing
+# 仅测试发布
   GITHUB_TOKEN=gh... \
  DEBUG=true \
 GITHUB_REPO=warpdotsys/rooted-graphene \
 OTA_VERSION=2025021100 \
 RELEASE_ID='' \
   bash -c '. rooted-ota.sh && releaseOta'
-# Test only GH pages deployment
+# 仅测试 GH Pages 部署
 GITHUB_REPO=warpdotsys/rooted-graphene \
 DEVICE_ID=oriole \
 MAGISK_PREINIT_DEVICE=metadata \
   bash -c '. rooted-ota.sh && findLatestVersion && checkBuildNecessary && createOtaServerData && uploadOtaServerData'
 
 
-# e2e test
+# 端到端测试
   GITHUB_TOKEN=gh... \
 GITHUB_REPO=warpdotsys/rooted-graphene \
 DEVICE_ID=oriole \
@@ -439,7 +434,7 @@ DEBUG=1 \
   bash -c '. rooted-ota.sh && createAndReleaseRootedOta'
 ```
 
-## References, Inspiration
+## 参考与灵感
 https://github.com/MuratovAS/grapheneos-magisk/blob/main/docker/Dockerfile
 
 https://xdaforums.com/t/guide-to-lock-bootloader-while-using-rooted-otaos-magisk-root.4510295/
