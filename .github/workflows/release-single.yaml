@@ -133,9 +133,12 @@ jobs:
           else
             DEBUG=1 bash -c '. rooted-ota.sh && createAndReleaseRootedOta'
           fi
-      - name: 保存工具缓存
-        uses: actions/cache/save@v4
+      - name: 调试 — 检查 .tmp 目录
         if: always()
+        run: ls -la .tmp/ 2>&1 || echo "NO .TMP DIR"
+      - name: 保存工具缓存（成功时）
+        uses: actions/cache/save@v4
+        continue-on-error: true
         with:
           path: .tmp
           key: tmp-tools-${{ runner.os }}-v1
