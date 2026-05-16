@@ -114,22 +114,32 @@ function initToolCache() {
     mkdir -p .tmp
     cp -r .tool-cache/* .tmp/
     print "从 .tool-cache 恢复了 $(ls .tool-cache | wc -l) 个工具"
+    ls -la .tool-cache/ | head -10 || true
+  else
+    print "工具缓存不存在，将在线下载"
   fi
 }
 
 # 将 .tmp/ 中的工具二进制保存到 .tool-cache/ 供后续构建复用
-# 仅保存可执行工具和重要小文件，跳过 zip/ota/工作目录
 function saveToolCache() {
-  if [ ! -d ".tmp" ]; then return; fi
+  if [ ! -d ".tmp" ]; then printRed "saveToolCache: .tmp 不存在"; return; fi
+  print "saveToolCache: .tmp 中存在以下文件："
+  ls -la .tmp/ 2>&1 | head -20 || true
   mkdir -p .tool-cache
-  # 明确列出要缓存的文件（工具二进制 + 模块）
+  local count=0
   local tools="avbroot magiskboot ksud ksud.version ksu_module.ko afsr custota-tool"
   for tool in $tools; do
     if [ -f ".tmp/$tool" ]; then
       cp ".tmp/$tool" ".tool-cache/$tool"
+      count=$((count + 1))
+      print "  缓存 $tool"
     fi
   done
-  print "已保存工具缓存到 .tool-cache/"
+  if [ "$count" -gt 0 ]; then
+    print "已保存 $count 个工具到 .tool-cache/"
+  else
+    printYellow "saveToolCache: .tmp 中未找到任何可缓存工具"
+  fi
 }
 
 # 解析自动检测标记 "auto"，将 *_VERSION=auto 的变量替换为实际最新版本
@@ -180,13 +190,12 @@ function createAndReleaseRootedOta() {
 
   createOtaServerData
   uploadOtaServerData
-  saveToolCache
 }
 
 function createRootedOta() {
   initDependencyVersions
   initToolCache
-  [[ "$SKIP_CLEANUP" != 'true' ]] && trap cleanup EXIT ERR
+  [[ "$SKIP_CLEANUP" != 'true' ]] && trap 'saveToolCache; cleanup' EXIT ERR
 
   findLatestVersion
   checkBuildNecessary
