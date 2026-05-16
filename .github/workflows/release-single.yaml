@@ -86,8 +86,8 @@ jobs:
         id: cache-tools-restore
         uses: actions/cache/restore@v4
         with:
-          path: .tmp
-          key: tmp-tools-${{ runner.os }}-v1
+          path: .tool-cache
+          key: tool-cache-${{ runner.os }}-v1
       - name: 预拉取 Docker 镜像
         run: |
           docker pull python:$(grep PYTHON_VERSION rooted-ota.sh | head -1 | cut -d: -f3 | tr -d " #'") 2>&1 | tail -1
@@ -133,12 +133,12 @@ jobs:
           else
             DEBUG=1 bash -c '. rooted-ota.sh && createAndReleaseRootedOta'
           fi
-      - name: 调试 — 检查 .tmp 目录
+      - name: 调试 — 检查缓存保存目录
         if: always()
-        run: ls -la .tmp/ 2>&1 || echo "NO .TMP DIR"
+        run: ls -la .tool-cache/ 2>&1 || echo "NO TOOL-CACHE DIR"
       - name: 保存工具缓存（成功时）
         uses: actions/cache/save@v4
         continue-on-error: true
         with:
-          path: .tmp
-          key: tmp-tools-${{ runner.os }}-v1
+          path: .tool-cache
+          key: tool-cache-${{ runner.os }}-v1

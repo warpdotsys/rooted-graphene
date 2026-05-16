@@ -108,6 +108,30 @@ function fetchLatestCommit() {
   echo "${sha:-$fallback}"
 }
 
+# 从缓存恢复工具二进制到 .tmp（如果 .tool-cache/ 存在）
+function initToolCache() {
+  if [ -d ".tool-cache" ] && [ "$(ls -A .tool-cache 2>/dev/null)" ]; then
+    mkdir -p .tmp
+    cp -r .tool-cache/* .tmp/
+    print "从 .tool-cache 恢复了 $(ls .tool-cache | wc -l) 个工具"
+  fi
+}
+
+# 将 .tmp/ 中的工具二进制保存到 .tool-cache/ 供后续构建复用
+# 仅保存可执行工具和重要小文件，跳过 zip/ota/工作目录
+function saveToolCache() {
+  if [ ! -d ".tmp" ]; then return; fi
+  mkdir -p .tool-cache
+  # 明确列出要缓存的文件（工具二进制 + 模块）
+  local tools="avbroot magiskboot ksud ksud.version ksu_module.ko afsr custota-tool"
+  for tool in $tools; do
+    if [ -f ".tmp/$tool" ]; then
+      cp ".tmp/$tool" ".tool-cache/$tool"
+    fi
+  done
+  print "已保存工具缓存到 .tool-cache/"
+}
+
 # 解析自动检测标记 "auto"，将 *_VERSION=auto 的变量替换为实际最新版本
 # 在脚本各入口函数（createRootedOta, generateKeys 等）中被调用
 function initDependencyVersions() {
@@ -156,10 +180,12 @@ function createAndReleaseRootedOta() {
 
   createOtaServerData
   uploadOtaServerData
+  saveToolCache
 }
 
 function createRootedOta() {
   initDependencyVersions
+  initToolCache
   [[ "$SKIP_CLEANUP" != 'true' ]] && trap cleanup EXIT ERR
 
   findLatestVersion
@@ -170,9 +196,7 @@ function createRootedOta() {
 
 function cleanup() {
   print "正在清理..."
-  # 删除构建产物和大文件，保留工具二进制供显式缓存保存
-  rm -rf .tmp/*.zip .tmp/ksu_work .tmp/extracted* .tmp/my-avbroot-setup .tmp/*.sig .tmp/*.csig .tmp/*.ota*
-  chown -R "$(id -u):$(id -g)" .tmp 2>/dev/null || true
+  rm -rf .tmp
   unset KEY_AVB_BASE64 KEY_OTA_BASE64 CERT_OTA_BASE64
   print "清理完成。"
 }
