@@ -114,7 +114,6 @@ function initToolCache() {
     mkdir -p .tmp
     cp -r .tool-cache/* .tmp/
     print "从 .tool-cache 恢复了 $(ls .tool-cache | wc -l) 个工具"
-    ls -la .tool-cache/ | head -10 || true
   else
     print "工具缓存不存在，将在线下载"
   fi
@@ -123,8 +122,6 @@ function initToolCache() {
 # 将 .tmp/ 中的工具二进制保存到 .tool-cache/ 供后续构建复用
 function saveToolCache() {
   if [ ! -d ".tmp" ]; then printRed "saveToolCache: .tmp 不存在"; return; fi
-  print "saveToolCache: .tmp 中存在以下文件："
-  ls -la .tmp/ 2>&1 | head -20 || true
   mkdir -p .tool-cache
   local count=0
   local tools="avbroot magiskboot ksud ksud.version ksu_module.ko afsr custota-tool"
@@ -132,14 +129,9 @@ function saveToolCache() {
     if [ -f ".tmp/$tool" ]; then
       cp ".tmp/$tool" ".tool-cache/$tool"
       count=$((count + 1))
-      print "  缓存 $tool"
     fi
   done
-  if [ "$count" -gt 0 ]; then
-    print "已保存 $count 个工具到 .tool-cache/"
-  else
-    printYellow "saveToolCache: .tmp 中未找到任何可缓存工具"
-  fi
+  print "已保存 $count 个工具到 .tool-cache/"
 }
 
 # 解析自动检测标记 "auto"，将 *_VERSION=auto 的变量替换为实际最新版本
@@ -207,16 +199,6 @@ function createRootedOta() {
 
 function cleanup() {
   print "正在清理..."
-  print "DEBUG cleanup: PWD=$(pwd)"
-  if [ -d ".tmp" ]; then
-    print "DEBUG cleanup: .tmp 存在，内容："
-    ls -la .tmp/ 2>&1 | head -10 || true
-  else
-    printRed "DEBUG cleanup: .tmp 不存在！"
-    print "DEBUG cleanup: 查找 .tmp..."
-    find . -name ".tmp" -maxdepth 3 -type d 2>/dev/null || true
-    ls -la 2>/dev/null | head -5 || true
-  fi
   saveToolCache
   rm -rf .tmp
   unset KEY_AVB_BASE64 KEY_OTA_BASE64 CERT_OTA_BASE64
