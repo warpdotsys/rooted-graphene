@@ -170,10 +170,8 @@ function createRootedOta() {
 
 function cleanup() {
   print "正在清理..."
-  # 删除构建产物和大文件（zip、工作目录、Docker 残留），
-  # 保留工具二进制（magiskboot/avbroot/ksud/ko 等）供 Post cache 持久化
+  # 删除构建产物和大文件，保留工具二进制供显式缓存保存
   rm -rf .tmp/*.zip .tmp/ksu_work .tmp/extracted* .tmp/my-avbroot-setup .tmp/*.sig .tmp/*.csig .tmp/*.ota*
-  # 递归权限修复，避免 Docker 创建的 root 属主文件影响下次 checkout
   chown -R "$(id -u):$(id -g)" .tmp 2>/dev/null || true
   unset KEY_AVB_BASE64 KEY_OTA_BASE64 CERT_OTA_BASE64
   print "清理完成。"
