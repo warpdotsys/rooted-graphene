@@ -527,10 +527,12 @@ import shutil; shutil.rmtree('lib', ignore_errors=True)
 function detectKsuKmi() {
   local bootImg="$1"
   local workDir=".tmp/ksu_kmi_detect"
+  rm -rf "$workDir"
   mkdir -p "$workDir"
 
-  # 解包 boot.img 提取内核
-  .tmp/magiskboot unpack "$bootImg" -d "$workDir" >/dev/null 2>&1 || true
+  # magiskboot unpack 解压到当前目录，不支持 -d 参数
+  # 所以需要在工作目录的子 shell 中运行
+  (cd "$workDir" && ../magiskboot unpack "../$bootImg" >/dev/null 2>&1) || true
 
   local kernelFile="$workDir/kernel"
   if [ ! -f "$kernelFile" ]; then
