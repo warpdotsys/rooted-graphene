@@ -1,10 +1,19 @@
-> ⚠️ Note that no new OTAs are published on this URL.
+OTA builds for rooted GrapheneOS with custom signing keys.
 
-They moved to [their own GitHub organization](https://rooted-graphene.github.io/ota/).
+## Flavors
 
-See [announcement](https://github.com/schnatterer/rooted-graphene/blob/81e4bda/README.md#2025032500) for details.
+* [magisk](magisk) — Magisk root
+* [rootless](rootless) — Stock rootless (for switching off root)
+* [kernelsu](kernelsu) — KernelSU root
 
-For historical reasons, you can find the last versions of these flavors here:
+## Usage
 
-* [magisk](magisk)
-* [rootless](rootless)
+Open Custota app and set the OTA server URL to:
+
+* `https://warpdotsys.github.io/rooted-graphene/magisk` — for Magisk root
+* `https://warpdotsys.github.io/rooted-graphene/rootless` — for rootless
+* `https://warpdotsys.github.io/rooted-graphene/kernelsu` — for KernelSU root
+
+## Source
+
+See [main branch](https://github.com/warpdotsys/rooted-graphene) for build scripts.
