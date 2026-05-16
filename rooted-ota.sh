@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# 项目根目录绝对路径（供子进程切换工作目录后仍能引用）
+readonly PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+
 # 需要 git、jq 和 curl
 
 KEY_AVB=${KEY_AVB:-avb.key}
@@ -627,33 +630,30 @@ function injectKsuIntoOta() {
 
   # 4. 使用 ksud 修补 boot.img
   print "正在用 KernelSU 修补 boot.img（KMI: $kmi）..."
+  # ksud 内部会切换工作目录，所有路径必须用绝对路径
   local ksudArgs=()
-  ksudArgs+=("-b" "$workDir/extracted/boot.img")
+  ksudArgs+=("-b" "$PROJECT_ROOT/$workDir/extracted/boot.img")
   ksudArgs+=("--kmi" "$kmi")
-  ksudArgs+=("--magiskboot" ".tmp/magiskboot")
-  ksudArgs+=("-o" "$workDir/patched")
+  ksudArgs+=("--magiskboot" "$PROJECT_ROOT/.tmp/magiskboot")
+  ksudArgs+=("-o" "$PROJECT_ROOT/$workDir/patched")
 
   # 使用下载的 .ko 模块（如果可用，比 ksud 内置的更新）
-  if [ -f ".tmp/ksu_module.ko" ]; then
+  if [ -f "$PROJECT_ROOT/.tmp/ksu_module.ko" ]; then
     print "使用外部 .ko 模块（来自请求的 KSU 版本）"
-    ksudArgs+=("--module" ".tmp/ksu_module.ko")
+    ksudArgs+=("--module" "$PROJECT_ROOT/.tmp/ksu_module.ko")
   fi
 
   if [ "$KSU_ALLOW_SHELL" = 'true' ]; then
     ksudArgs+=("--allow-shell")
   fi
 
-  .tmp/ksud boot-patch "${ksudArgs[@]}"
+  "$PROJECT_ROOT/.tmp/ksud" boot-patch "${ksudArgs[@]}"
 
   # 5. 找到修补后的 boot 镜像
   local patchedBoot
-  patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f \( -name "*boot*.img" -o -name "*boot*.img" \) 2>/dev/null | head -1)
-  # ksud 输出文件名可能不同；查找任何 img 文件
+  patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f \( -name "*boot*.img" -o -name "*.img" \) 2>/dev/null | head -1)
   if [ -z "$patchedBoot" ]; then
-    patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f -name "*.img" 2>/dev/null | head -1)
-  fi
-  if [ -z "$patchedBoot" ]; then
-    # ksud 可能输出原始名称的文件
+    # ksud 可能输出其他后缀的文件
     patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f 2>/dev/null | head -1)
   fi
   if [ -z "$patchedBoot" ]; then
