@@ -201,10 +201,22 @@ function createRootedOta() {
   checkBuildNecessary
   downloadAndroidDependencies
   patchOTAs
+  # 构建成功，立即保存工具缓存（此时 .tmp 肯定存在）
+  saveToolCache
 }
 
 function cleanup() {
   print "正在清理..."
+  print "DEBUG cleanup: PWD=$(pwd)"
+  if [ -d ".tmp" ]; then
+    print "DEBUG cleanup: .tmp 存在，内容："
+    ls -la .tmp/ 2>&1 | head -10 || true
+  else
+    printRed "DEBUG cleanup: .tmp 不存在！"
+    print "DEBUG cleanup: 查找 .tmp..."
+    find . -name ".tmp" -maxdepth 3 -type d 2>/dev/null || true
+    ls -la 2>/dev/null | head -5 || true
+  fi
   saveToolCache
   rm -rf .tmp
   unset KEY_AVB_BASE64 KEY_OTA_BASE64 CERT_OTA_BASE64
