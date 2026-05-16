@@ -82,16 +82,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: 缓存 .tmp 目录
-        id: cache-tmp
+      - name: 缓存工具二进制
+        id: cache-tools
         uses: actions/cache@v4
         with:
           path: .tmp
-          # 用 OTA 版本作 key，构建成功后会持久化
-          # 版本更新时自动失效；force-build 时传自定义 ota-version 也可避免命中
-          key: tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-${{ github.event.inputs.ota-version || inputs.ota-version || 'latest' }}-${{ github.event.inputs.ksu-version || inputs.ksu-version || 'none' }}
-          restore-keys: |
-            tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-
+          key: tmp-tools-${{ runner.os }}-v1
       - name: 预拉取 Docker 镜像
         run: |
           docker pull python:$(grep PYTHON_VERSION rooted-ota.sh | head -1 | cut -d: -f3 | tr -d " #'") 2>&1 | tail -1
