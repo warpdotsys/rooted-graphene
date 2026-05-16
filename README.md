@@ -253,9 +253,9 @@ OTA 构建迁移到了独立的 GitHub 组织，以获得完整的 GitHub Action
 
 * 从设置 → 应用 → 查看所有应用 →（三点菜单）→ 显示系统 →（找到 "System Updater" 应用），[禁用系统更新应用](https://github.com/chenxiaolong/avbroot#ota-updates)（或阻止其网络访问）。
 * 打开 Custota 应用，设置 OTA 服务器地址为以下之一：
-  * **https://warpdotsys.github.io/rooted-graphene/kernelsu**（推荐，KernelSU root）
-  * https://warpdotsys.github.io/rooted-graphene/magisk（Magisk root）
-  * https://warpdotsys.github.io/rooted-graphene/rootless（无 root）
+  * https://warpdotsys.github.io/rooted-graphene/kernelsu （推荐，KernelSU root）
+  * https://warpdotsys.github.io/rooted-graphene/magisk （Magisk root）
+  * https://warpdotsys.github.io/rooted-graphene/rootless （无 root）
 
 或者你也可以通过 `adb sideload` 手动更新：
 * 重启设备，按住音量减键直到进入 bootloader 界面。
