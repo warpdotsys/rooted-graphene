@@ -170,7 +170,10 @@ function createRootedOta() {
 
 function cleanup() {
   print "正在清理..."
-  rm -rf .tmp
+  # 保留工具二进制（magiskboot/avbroot/ksud/ko 等可缓存文件），
+  # 仅清理大型构建产物（OTA zip、解压的工作目录等）
+  rm -rf .tmp/*.zip .tmp/ksu_work .tmp/extracted* .tmp/my-avbroot-setup
+  # 但保留 .tmp 目录本身和工具二进制文件
   unset KEY_AVB_BASE64 KEY_OTA_BASE64 CERT_OTA_BASE64
   print "清理完成。"
 }
