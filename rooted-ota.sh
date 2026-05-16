@@ -630,12 +630,28 @@ function injectKsuIntoOta() {
 
   # 4. 使用 ksud 修补 boot.img
   print "正在用 KernelSU 修补 boot.img（KMI: $kmi）..."
+  
+  # 前置检查：确认 boot.img 存在且可读
+  local bootImgPath="$PROJECT_ROOT/$workDir/extracted/boot.img"
+  if [ ! -f "$bootImgPath" ]; then
+    printRed "boot.img 不存在于 $bootImgPath"
+    ls -la "$PROJECT_ROOT/$workDir/extracted/" 2>/dev/null || true
+    exit 1
+  fi
+  if [ ! -r "$bootImgPath" ]; then
+    printRed "boot.img 不可读（权限问题）"
+    ls -la "$bootImgPath"
+    exit 1
+  fi
+  
   # ksud 内部会切换工作目录，所有路径必须用绝对路径
+  mkdir -p "$workDir/patched"
   local ksudArgs=()
-  ksudArgs+=("-b" "$PROJECT_ROOT/$workDir/extracted/boot.img")
+  ksudArgs+=("-b" "$bootImgPath")
   ksudArgs+=("--kmi" "$kmi")
   ksudArgs+=("--magiskboot" "$PROJECT_ROOT/.tmp/magiskboot")
   ksudArgs+=("-o" "$PROJECT_ROOT/$workDir/patched")
+  ksudArgs+=("--out-name" "ksu_patched_boot.img")
 
   # 使用下载的 .ko 模块（如果可用，比 ksud 内置的更新）
   if [ -f "$PROJECT_ROOT/.tmp/ksu_module.ko" ]; then
@@ -651,11 +667,7 @@ function injectKsuIntoOta() {
 
   # 5. 找到修补后的 boot 镜像
   local patchedBoot
-  patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f \( -name "*boot*.img" -o -name "*.img" \) 2>/dev/null | head -1)
-  if [ -z "$patchedBoot" ]; then
-    # ksud 可能输出其他后缀的文件
-    patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f 2>/dev/null | head -1)
-  fi
+  patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f -name "*.img" 2>/dev/null | head -1)
   if [ -z "$patchedBoot" ]; then
     printRed "在 $workDir/patched 中未找到修补后的 boot 镜像"
     ls -la "$workDir/patched/" 2>/dev/null || true
