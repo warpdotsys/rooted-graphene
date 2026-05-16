@@ -1,7 +1,7 @@
-name: Release single device
+name: 发布单设备 OTA
 
 on:
-  # Note that push/PR will not release, only build to see if there are obvious failures
+  # push/PR 不会真正发布，只构建检查是否有明显失败
   push:
     branches:
       - '*'
@@ -26,63 +26,63 @@ on:
         type: string
         default: ''
   
-  # Allows you to run this workflow manually from the Actions tab
+  # 允许从 Actions 标签页手动触发
   workflow_dispatch:
     inputs:
       device-id:
-        description: Device ID
+        description: 设备 ID
         required: true
       magisk-preinit-device:
-        description: Magisk preinit device
+        description: Magisk preinit 设备分区
         required: false
       ksu-version:
-        description: KernelSU version (e.g. 'v3.2.4')
+        description: KernelSU 版本（例如 'v3.2.4'）
         required: false
       ksu-kmi:
-        description: KernelSU KMI (auto-detected if empty)
+        description: KernelSU KMI（留空则自动检测）
         required: false
       skip-rootless:
-        description: skip building rootless OTA
+        description: 跳过构建 rootless OTA
         type: boolean
         required: false
       skip-rooted:
-        description: skip building rooted OTA
+        description: 跳过构建 rooted OTA
         type: boolean
         required: false
       upload-test-ota:
-        description: Upload OTA to test folder
+        description: 将 OTA 上传到 test 目录
         required: false
         type: boolean
       force-build:
-        description: Force artifacts to be built and uploaded to release if non-existing
+        description: 强制构建并上传产物到 release（即使已存在）
         required: false
         type: boolean
       force-ota-server-upload:
-        description: Force OTA server upload
+        description: 强制上传到 OTA 服务器
         required: false
         type: boolean
       skip-release:
-        description: Skip release (build only)
+        description: 跳过发布（仅构建）
         required: false
         type: boolean
       ota-version:
-        description: OTA version
+        description: OTA 版本
         required: false
       magisk-version:
-        description: Magisk version
+        description: Magisk 版本
         required: false
 jobs:
   build-device:
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # Make sure to not waste hours when some command does not return 
+    timeout-minutes: 20 # 避免某个命令卡住时浪费数小时
     steps:
       - uses: actions/checkout@v6
         with:
-          # Allow for switching to github-pages branch
+          # 允许切换到 gh-pages 分支
           fetch-depth: 0
-      - name: Set inputs
-        # Empty means, use version defined in rooted-ota.sh
-        # Note the difference between github.event.inputs (workflow_dispatch) and inputs (workflow_call)
+      - name: 设置输入参数
+        # 空值表示使用 rooted-ota.sh 中定义的默认版本
+        # 注意 github.event.inputs（workflow_dispatch）和 inputs（workflow_call）的区别
         run: |
           echo "DEVICE_ID=$(echo '${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}' | xargs)" >> $GITHUB_ENV
           if [[ "${{ github.event.inputs.skip-rooted }}" != "true" ]]; then
@@ -100,7 +100,7 @@ jobs:
           echo "KSU_KMI=$(echo '${{ github.event.inputs.ksu-kmi || inputs.ksu-kmi || '' }}' | xargs)" >> $GITHUB_ENV
           
           if [[ "${{ github.event_name }}" == "push" ]]  || [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "Running on push: Simple build without release for device $DEVICE_ID"
+            echo "在 push 上运行：仅构建不发布，设备 $DEVICE_ID"
             echo "FORCE_BUILD=true" >> $GITHUB_ENV
             echo "SKIP_RELEASE=true" >> $GITHUB_ENV
             echo "GITHUB_TOKEN=must-be-set-but-is-not-used" >> $GITHUB_ENV
@@ -108,11 +108,11 @@ jobs:
             echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
           fi
       - run: sudo apt-get install -y jq curl git
-      - name: release
+      - name: 发布
         env:
           GITHUB_REPO: ${{ github.repository }}
-          # Load dev keys from vars. This is a random key, only used for signing throwaway dev builds. Not a leak!
-          # Loading the keys from secrets will make them inaccessible for untrusted PRs, leaving us with failed builds.
+          # 从 vars 加载开发用密钥。这是随机生成的密钥，仅用于签名一次性开发构建，不是泄漏！
+          # 从 secrets 加载密钥会使不可信的 PR 无法访问，导致构建失败。
           KEY_AVB_BASE64: ${{ vars.KEY_AVB_BASE64 }}
           CERT_OTA_BASE64: ${{ vars.CERT_OTA_BASE64 }}
           KEY_OTA_BASE64: ${{ vars.KEY_OTA_BASE64 }}
