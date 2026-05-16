@@ -62,6 +62,15 @@ SKIP_MODULES=${SKIP_MODULES:-'false'}
 # Upload OTA to test folder on OTA server
 UPLOAD_TEST_OTA=${UPLOAD_TEST_OTA:-false}
 
+# KernelSU support: set to a version like 'v3.2.4' or 'latest' to enable KSU flavor
+KSU_VERSION=${KSU_VERSION:-''}
+# KMI (Kernel Module Interface) for KernelSU. Auto-detected if empty.
+KSU_KMI=${KSU_KMI:-''}
+# Allow shell root access via KernelSU by default
+KSU_ALLOW_SHELL=${KSU_ALLOW_SHELL:-'true'}
+# KernelPatch version for kptools-linux / kpimg-android
+KERNELPATCH_VERSION=${KERNELPATCH_VERSION:-'0.13.1'}
+
 OTA_CHANNEL=${OTA_CHANNEL:-stable-security-preview} # Alternative: 'stable' or 'alpha'
 NO_COLOR=${NO_COLOR:-''}
 OTA_BASE_URL="https://releases.grapheneos.org"
@@ -154,6 +163,14 @@ function checkBuildNecessary() {
     printGreen "SKIP_ROOTLESS set, not creating rootless OTA"
   fi
 
+  if [[ -n "$KSU_VERSION" ]]; then
+    if [[ "$SKIP_ROOTLESS" == 'true' ]]; then
+      printRed "KSU_VERSION is set but SKIP_ROOTLESS=true - KSU requires rootless OTA as base. Aborting."
+      exit 1
+    fi
+    POTENTIAL_ASSETS['ksu']="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}-ksu-${KSU_VERSION}$(createAssetSuffix).zip"
+  fi
+
   RELEASE_ID=''
   local response
 
@@ -234,7 +251,7 @@ function downloadAndroidDependencies() {
   checkMandatoryVariable 'MAGISK_VERSION' 'OTA_TARGET'
 
   mkdir -p .tmp
-  if ! ls ".tmp/magisk-$MAGISK_VERSION.apk" >/dev/null 2>&1 && [[ "${POTENTIAL_ASSETS['magisk']+isset}" ]]; then
+  if ! ls ".tmp/magisk-$MAGISK_VERSION.apk" >/dev/null 2>&1 && { [[ "${POTENTIAL_ASSETS['magisk']+isset}" ]] || [[ "${POTENTIAL_ASSETS['ksu']+isset}" ]]; }; then
     curl --fail -sLo ".tmp/magisk-$MAGISK_VERSION.apk" "https://github.com/topjohnwu/Magisk/releases/download/$MAGISK_VERSION/Magisk-$MAGISK_VERSION.apk"
   fi
 
@@ -312,7 +329,13 @@ function patchOTAs() {
 
   base642key
 
+  # Run the standard Docker-based patching for rootless/magisk flavors.
+  # KSU is handled as a post-processing step (below) and is skipped here.
   for flavor in "${!POTENTIAL_ASSETS[@]}"; do
+    if [[ "$flavor" == 'ksu' ]]; then
+      continue  # KSU is processed separately after rootless OTA is built
+    fi
+
     local targetFile=".tmp/${POTENTIAL_ASSETS[$flavor]}"
 
     if ls "$targetFile" >/dev/null 2>&1; then
@@ -363,6 +386,261 @@ function patchOTAs() {
     fi
     
   done
+
+  # ------------------------------------------------------------------
+  # KernelSU post-processing: inject KSU .ko into rootless OTA's boot
+  # ------------------------------------------------------------------
+  if [[ -n "${POTENTIAL_ASSETS['ksu']+isset}" ]]; then
+    local rootlessOta=".tmp/${POTENTIAL_ASSETS['rootless']}"
+    local ksuTarget=".tmp/${POTENTIAL_ASSETS['ksu']}"
+
+    if ls "$ksuTarget" >/dev/null 2>&1; then
+      printGreen "File $ksuTarget already exists locally, not patching."
+    elif ls "$rootlessOta" >/dev/null 2>&1; then
+      print "Building KSU OTA from rootless base: $rootlessOta"
+      injectKsuIntoOta "$rootlessOta" "$ksuTarget"
+    else
+      printRed "Cannot build KSU OTA: rootless OTA not found at $rootlessOta"
+      exit 1
+    fi
+  fi
+}
+
+# ------------------------------------------------------------------
+# KernelSU functions
+# ------------------------------------------------------------------
+
+function downloadKsud() {
+  local ksudBin=".tmp/ksud"
+  local ksuVer="${KSU_VERSION#v}"
+
+  if [ -f "$ksudBin" ] && [ -f ".tmp/ksud.version" ] && [ "$(cat .tmp/ksud.version)" = "$KSU_VERSION" ]; then
+    return
+  fi
+
+  rm -f "$ksudBin"
+
+  local ksudUrl=""
+
+  # Try to get ksud from the target release first
+  # KernelSU v3.2.1 is the last version with pre-built Linux binaries in releases
+  # v3.2.2+ dropped Linux ksud from release assets
+  ksudUrl=$(curl -sL "https://api.github.com/repos/tiann/KernelSU/releases/tags/v${ksuVer}" \
+    | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for a in data.get('assets', []):
+    if 'ksud-x86_64-unknown-linux-musl' in a['name']:
+        print(a['browser_download_url'])
+        break
+" 2>/dev/null)
+
+  if [ -z "$ksudUrl" ]; then
+    print "KSU $KSU_VERSION has no Linux ksud binary. Falling back to v3.2.1 (last version with pre-built ksud)..."
+    ksudUrl="https://github.com/tiann/KernelSU/releases/download/v3.2.1/ksud-x86_64-unknown-linux-musl"
+
+    # Also download the matching .ko module from the target version for injection
+    local kmi="${KSU_KMI}"
+    if [ -n "$kmi" ]; then
+      local koTarget=".tmp/ksu_module.ko"
+      print "Downloading ${kmi}_kernelsu.ko from KernelSU $KSU_VERSION..."
+      curl --fail -sLo "$koTarget" \
+        "https://github.com/tiann/KernelSU/releases/download/v${ksuVer}/${kmi}_kernelsu.ko" || {
+        printYellow "Failed to download .ko for KMI $kmi from v${ksuVer}, will use builtin"
+        rm -f "$koTarget"
+      }
+    fi
+  fi
+
+  print "Downloading ksud..."
+  curl --fail -sLo "$ksudBin" "$ksudUrl"
+  chmod +x "$ksudBin"
+  echo "$KSU_VERSION" > ".tmp/ksud.version"
+  printGreen "ksud downloaded (from ${ksudUrl})"
+}
+
+function downloadMagiskBoot() {
+  local magiskbootBin=".tmp/magiskboot"
+
+  if [ -f "$magiskbootBin" ]; then
+    return
+  fi
+
+  print "Extracting magiskboot from Magisk APK..."
+  local magiskApk=".tmp/magisk-$MAGISK_VERSION.apk"
+  if [ ! -f "$magiskApk" ]; then
+    print "Downloading Magisk $MAGISK_VERSION..."
+    curl --fail -sLo "$magiskApk" \
+      "https://github.com/topjohnwu/Magisk/releases/download/$MAGISK_VERSION/Magisk-$MAGISK_VERSION.apk"
+  fi
+
+  python3 -c "
+import zipfile, os, stat
+with zipfile.ZipFile('$magiskApk') as z:
+    z.extract('lib/x86_64/libmagiskboot.so', '.')
+os.rename('lib/x86_64/libmagiskboot.so', '$magiskbootBin')
+os.chmod('$magiskbootBin', stat.S_IRWXU)
+import shutil; shutil.rmtree('lib', ignore_errors=True)
+"
+  printGreen "magiskboot extracted"
+}
+
+function detectKsuKmi() {
+  local bootImg="$1"
+  local workDir=".tmp/ksu_kmi_detect"
+  mkdir -p "$workDir"
+
+  # Unpack boot.img to extract kernel
+  .tmp/magiskboot unpack "$bootImg" -d "$workDir" >/dev/null 2>&1
+
+  local kernelFile="$workDir/kernel"
+  if [ ! -f "$kernelFile" ]; then
+    printRed "Failed to extract kernel from boot.img"
+    rm -rf "$workDir"
+    echo "unknown"
+    return
+  fi
+
+  # Read kernel version string
+  local kernelVer
+  kernelVer=$(strings "$kernelFile" | grep -E '^Linux version [0-9]+\.[0-9]+' | head -1)
+  rm -rf "$workDir"
+
+  if [ -z "$kernelVer" ]; then
+    printRed "Could not detect kernel version from boot.img"
+    echo "unknown"
+    return
+  fi
+
+  print "Kernel version: $kernelVer"
+
+  # Parse major.minor version
+  local major minor
+  major=$(echo "$kernelVer" | sed 's/Linux version //' | cut -d'.' -f1)
+  minor=$(echo "$kernelVer" | sed 's/Linux version //' | cut -d'.' -f2)
+
+  # Map kernel version to KMI
+  # See https://kernelsu.org/guide/installation.html#kmi
+  local kmi=""
+  case "${major}.${minor}" in
+    "5.10") kmi="android12-5.10" ;;
+    "5.15")
+      # Check for android13 vs android14: android13-5.15 is more common
+      # but newer Pixel devices with kernel 5.15 might use android14-5.15
+      # Default to android13-5.15 for broader compatibility
+      kmi="android13-5.15" ;;
+    "6.1")  kmi="android14-6.1" ;;
+    "6.6")  kmi="android15-6.6" ;;
+    "6.12") kmi="android16-6.12" ;;
+    *)
+      printRed "Unknown kernel version ${major}.${minor}, cannot determine KMI"
+      echo "unknown"
+      return
+      ;;
+  esac
+
+  echo "$kmi"
+}
+
+function injectKsuIntoOta() {
+  local rootlessOta="$1"
+  local ksuTarget="$2"
+  local workDir=".tmp/ksu_work"
+
+  print "Injecting KernelSU into OTA..."
+  mkdir -p "$workDir"
+
+  # 1. Ensure required tools
+  downloadAvBroot
+  downloadKsud
+  downloadMagiskBoot
+
+  # 2. Extract boot.img from rootless OTA
+  print "Extracting boot.img from rootless OTA..."
+  .tmp/avbroot ota extract \
+    --input "$rootlessOta" \
+    --directory "$workDir/extracted" \
+    --boot-only
+  printGreen "boot.img extracted"
+
+  # 3. Detect KMI if not set via env
+  local kmi="${KSU_KMI}"
+  if [ -z "$kmi" ]; then
+    print "Auto-detecting KMI from boot.img..."
+    kmi=$(detectKsuKmi "$workDir/extracted/boot.img")
+    if [ "$kmi" = "unknown" ]; then
+      printRed "KMI detection failed. Set KSU_KMI manually."
+      exit 1
+    fi
+    printGreen "Auto-detected KMI: $kmi"
+  else
+    print "Using configured KMI: $kmi"
+  fi
+
+  # 4. Patch boot.img with KernelSU using ksud
+  print "Patching boot.img with KernelSU (KMI: $kmi)..."
+  local ksudArgs=()
+  ksudArgs+=("-b" "$workDir/extracted/boot.img")
+  ksudArgs+=("--kmi" "$kmi")
+  ksudArgs+=("--magiskboot" ".tmp/magiskboot")
+  ksudArgs+=("-o" "$workDir/patched")
+
+  # Use downloaded .ko module if available (newer than ksud's builtin)
+  if [ -f ".tmp/ksu_module.ko" ]; then
+    print "Using external .ko module (from requested KSU version)"
+    ksudArgs+=("--module" ".tmp/ksu_module.ko")
+  fi
+
+  if [ "$KSU_ALLOW_SHELL" = 'true' ]; then
+    ksudArgs+=("--allow-shell")
+  fi
+
+  .tmp/ksud boot-patch "${ksudArgs[@]}"
+
+  # 5. Find the patched boot image
+  local patchedBoot
+  patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f \( -name "*boot*.img" -o -name "*boot*.img" \) 2>/dev/null | head -1)
+  # ksud output might be named differently; look for any img file
+  if [ -z "$patchedBoot" ]; then
+    patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f -name "*.img" 2>/dev/null | head -1)
+  fi
+  if [ -z "$patchedBoot" ]; then
+    # ksud might output raw file with the original name
+    patchedBoot=$(find "$workDir/patched" -maxdepth 1 -type f 2>/dev/null | head -1)
+  fi
+  if [ -z "$patchedBoot" ]; then
+    printRed "Failed to find patched boot image in $workDir/patched"
+    ls -la "$workDir/patched/" 2>/dev/null || true
+    exit 1
+  fi
+  printGreen "KernelSU patched boot image: $patchedBoot"
+
+  # 6. Create KSU OTA using avbroot --prepatched
+  print "Creating signed KSU OTA with prepatched boot.img..."
+  local avbrootArgs=()
+  avbrootArgs+=("ota" "patch")
+  avbrootArgs+=("--input" "$rootlessOta")
+  avbrootArgs+=("--output" "$ksuTarget")
+  avbrootArgs+=("--prepatched" "$patchedBoot")
+  avbrootArgs+=("--key-avb" "$KEY_AVB")
+  avbrootArgs+=("--key-ota" "$KEY_OTA")
+  avbrootArgs+=("--cert-ota" "$CERT_OTA")
+
+  if [ -v PASSPHRASE_AVB ] && [ -n "${PASSPHRASE_AVB+x}" ]; then
+    avbrootArgs+=("--pass-avb-env-var" "PASSPHRASE_AVB")
+  fi
+  if [ -v PASSPHRASE_OTA ] && [ -n "${PASSPHRASE_OTA+x}" ]; then
+    avbrootArgs+=("--pass-ota-env-var" "PASSPHRASE_OTA")
+  fi
+
+  .tmp/avbroot "${avbrootArgs[@]}"
+
+  # 7. Cleanup
+  if [ "$SKIP_CLEANUP" != 'true' ]; then
+    rm -rf "$workDir"
+  fi
+
+  printGreen "KSU OTA created: $ksuTarget"
 }
 
 function base642key() {
