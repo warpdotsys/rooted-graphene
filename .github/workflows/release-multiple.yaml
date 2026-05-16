@@ -1,0 +1,40 @@
+name: 自动构建多设备 OTA
+
+on:
+  # 每日检查 GrapheneOS 新版本并自动构建
+  schedule:
+    # UTC 02:00 = 北京时间 10:00，覆盖 GrapheneOS 的发布窗口
+    - cron: '0 2 * * *'
+
+  # 支持手动触发
+  workflow_dispatch:
+    inputs:
+      ksu-version:
+        description: KernelSU 版本（留空或 latest 则自动检测）
+        required: false
+        default: ''
+      ksu-kmi:
+        description: KernelSU KMI（留空则从 boot.img 自动检测）
+        required: false
+        default: ''
+      force-build:
+        description: 强制重新构建（即使已存在）
+        type: boolean
+        required: false
+        default: false
+      upload-test-ota:
+        description: 上传到 test 目录
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  build-shiba-ksu:
+    name: "shiba (Pixel 8) — KernelSU"
+    uses: ./.github/workflows/release-single.yaml
+    with:
+      device-id: shiba
+      magisk-preinit-device: sda10
+      ksu-version: ${{ inputs.ksu-version || 'latest' }}
+      ksu-kmi: ${{ inputs.ksu-kmi || '' }}
+    secrets: inherit

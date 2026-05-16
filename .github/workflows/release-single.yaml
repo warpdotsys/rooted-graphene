@@ -111,13 +111,14 @@ jobs:
       - name: 发布
         env:
           GITHUB_REPO: ${{ github.repository }}
-          # 从 vars 加载开发用密钥。这是随机生成的密钥，仅用于签名一次性开发构建，不是泄漏！
-          # 从 secrets 加载密钥会使不可信的 PR 无法访问，导致构建失败。
+          # 从 vars 加载签名密钥，从 secrets 加载密码
+          # PR/push 的开发构建使用随机 dev key 可忽略密码
           KEY_AVB_BASE64: ${{ vars.KEY_AVB_BASE64 }}
           CERT_OTA_BASE64: ${{ vars.CERT_OTA_BASE64 }}
           KEY_OTA_BASE64: ${{ vars.KEY_OTA_BASE64 }}
-          #PASSPHRASE_AVB: ${{ vars.PASSPHRASE_AVB }}
-          #PASSPHRASE_OTA: ${{ vars.PASSPHRASE_OTA }}
+          # 生产构建时从 secrets 加载密码（PR/push 的开发构建用无密码的 dev key，不需要密码）
+          PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
+          PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
         run: |
           if [[ $SKIP_RELEASE == 'true' ]]; then
             DEBUG=1 bash -c '. rooted-ota.sh && createRootedOta && createOtaServerData'
