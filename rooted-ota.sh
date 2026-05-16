@@ -397,18 +397,29 @@ function patchOTAs() {
       # 稍后会在需要时创建 csig 和设备 JSON 文件
       args+=("--skip-custota-tool")
 
-      # 需要将 .tmp 加入 PATH，但不能用 $PATH：因为这是宿主机的 PATH 而非容器的
-      # Python 镜像默认以 root 运行，所以在末尾要把文件所有者改回来
-      # 还有改进空间 😐️
-      # shellcheck disable=SC2046
-      docker run --rm -i $(tty &>/dev/null && echo '-t') -v "$PWD:/app"  -w /app \
-        -e PATH='/bin:/usr/local/bin:/sbin:/usr/bin/:/app/.tmp' \
-        --env-file <(env) \
-        python:${PYTHON_VERSION} sh -c \
-          "apk add openssh && \
-           pip install -r .tmp/my-avbroot-setup/requirements.txt && \
-           python .tmp/my-avbroot-setup/patch.py ${args[*]} ; result=\$?; \
-           chown -R $(id -u):$(id -g) .tmp; exit \$result"
+      # 使用预构建的 Docker 镜像（含 openssh + Python 依赖），跳过每次的 apk add / pip install
+      # 如果镜像不存在则回退到原始方法
+      local patch_image="rooted-ota-patch:latest"
+      if docker image inspect "$patch_image" &>/dev/null; then
+        # shellcheck disable=SC2046
+        docker run --rm -i $(tty &>/dev/null && echo '-t') -v "$PWD:/app"  -w /app \
+          -e PATH='/bin:/usr/local/bin:/sbin:/usr/bin/:/app/.tmp' \
+          --env-file <(env) \
+          "$patch_image" sh -c \
+            "python .tmp/my-avbroot-setup/patch.py ${args[*]} ; result=\$?; \
+             chown -R $(id -u):$(id -g) .tmp; exit \$result"
+      else
+        print "预构建镜像 $patch_image 不存在，回退到 python:${PYTHON_VERSION}"
+        # shellcheck disable=SC2046
+        docker run --rm -i $(tty &>/dev/null && echo '-t') -v "$PWD:/app"  -w /app \
+          -e PATH='/bin:/usr/local/bin:/sbin:/usr/bin/:/app/.tmp' \
+          --env-file <(env) \
+          "python:${PYTHON_VERSION}" sh -c \
+            "apk add openssh && \
+             pip install -r .tmp/my-avbroot-setup/requirements.txt && \
+             python .tmp/my-avbroot-setup/patch.py ${args[*]} ; result=\$?; \
+             chown -R $(id -u):$(id -g) .tmp; exit \$result"
+      fi
     
        printGreen "修补完成：${targetFile}"
     fi

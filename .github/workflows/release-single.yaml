@@ -33,7 +33,7 @@ on:
         description: 设备 ID
         required: true
       magisk-preinit-device:
-        description: Magisk preinit 设备分区
+        description: Magisk preinit 设备分区（留空则跳过 Magisk）
         required: false
       ksu-version:
         description: KernelSU 版本（留空或 'latest' 则自动检测最新版）
@@ -55,7 +55,7 @@ on:
         required: false
         type: boolean
       force-build:
-        description: 强制构建并上传产物到 release（即使已存在）
+        description: 强制重新构建（即使已存在）
         required: false
         type: boolean
       force-ota-server-upload:
@@ -75,20 +75,33 @@ on:
 jobs:
   build-device:
     runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 20 # 避免某个命令卡住时浪费数小时
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
         with:
-          # 允许切换到 gh-pages 分支
           fetch-depth: 0
+      - name: 缓存 .tmp 目录
+        id: cache-tmp
+        uses: actions/cache@v4
+        with:
+          path: .tmp
+          # key 包含设备、版本和 flavor，保持跨运行缓存
+          # OTA 版本变化或 force-build 时失效
+          key: tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-${{ github.event.inputs.ota-version || inputs.ota-version || 'latest' }}-${{ github.run_id }}
+          restore-keys: |
+            tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-${{ github.event.inputs.ota-version || inputs.ota-version || 'latest' }}-
+            tmp-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}-
+      - name: 预拉取 Docker 镜像
+        run: |
+          docker pull python:$(grep PYTHON_VERSION rooted-ota.sh | head -1 | cut -d: -f3 | tr -d " #'") 2>&1 | tail -1
+          echo "Docker 镜像已缓存"
       - name: 设置输入参数
-        # 空值表示使用 rooted-ota.sh 中定义的默认版本
-        # 注意 github.event.inputs（workflow_dispatch）和 inputs（workflow_call）的区别
         run: |
           echo "DEVICE_ID=$(echo '${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}' | xargs)" >> $GITHUB_ENV
-          if [[ "${{ github.event.inputs.skip-rooted }}" != "true" ]]; then
-            echo "MAGISK_PREINIT_DEVICE=$(echo '${{ github.event.inputs.magisk-preinit-device || inputs.magisk-preinit-device || 'sda10' }}' | xargs)" >> $GITHUB_ENV
-          fi
+          # magisk-preinit-device: 空字符串原样传递，不要回退到 sda10
+          RAW_MAGISK='${{ github.event.inputs.magisk-preinit-device || inputs.magisk-preinit-device }}'
+          [ -z "$RAW_MAGISK" ] && RAW_MAGISK=''
+          echo "MAGISK_PREINIT_DEVICE=$RAW_MAGISK" >> $GITHUB_ENV
           
           echo "MAGISK_VERSION=$(echo '${{ github.event.inputs.magisk-version || '' }}' | xargs)" >> $GITHUB_ENV
           echo "OTA_VERSION=$(echo '${{ github.event.inputs.ota-version || '' }}' | xargs)" >> $GITHUB_ENV
@@ -112,12 +125,9 @@ jobs:
       - name: 发布
         env:
           GITHUB_REPO: ${{ github.repository }}
-          # 从 vars 加载签名密钥，从 secrets 加载密码
-          # PR/push 的开发构建使用随机 dev key 可忽略密码
           KEY_AVB_BASE64: ${{ vars.KEY_AVB_BASE64 }}
           CERT_OTA_BASE64: ${{ vars.CERT_OTA_BASE64 }}
           KEY_OTA_BASE64: ${{ vars.KEY_OTA_BASE64 }}
-          # 生产构建时从 secrets 加载密码（PR/push 的开发构建用无密码的 dev key，不需要密码）
           PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
           PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
         run: |
