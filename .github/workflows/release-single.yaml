@@ -36,8 +36,9 @@ on:
         description: Magisk preinit 设备分区
         required: false
       ksu-version:
-        description: KernelSU 版本（例如 'v3.2.4'）
+        description: KernelSU 版本（留空或 'latest' 则自动检测最新版）
         required: false
+        default: 'latest'
       ksu-kmi:
         description: KernelSU KMI（留空则自动检测）
         required: false
