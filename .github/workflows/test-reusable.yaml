@@ -1,10 +1,11 @@
-name: 调用测试B
+name: 测试调用
 
 on:
   workflow_dispatch:
 
 jobs:
-  call-b:
-    uses: ./.github/workflows/test-expr-b.yaml
+  test:
+    uses: ./.github/workflows/test-s3.yaml
     with:
       device-id: shiba
+    secrets: inherit
