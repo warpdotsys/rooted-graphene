@@ -11,6 +11,7 @@ on:
     types: [synchronize, opened, reopened]
     paths:
       - rooted-ota.sh
+      - .github/workflows/*.yaml
 
   workflow_call:
     inputs:
