@@ -1,0 +1,21 @@
+name: 测试 - top-level permissions
+
+on:
+  workflow_call:
+    inputs:
+      device-id:
+        type: string
+  workflow_dispatch:
+    inputs:
+      device-id:
+        description: Device
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - run: echo "hello with top-level perms"
