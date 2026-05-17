@@ -1,0 +1,20 @@
+name: 测试3d - permissions but simple
+
+on:
+  workflow_call:
+    inputs:
+      device-id:
+        type: string
+  workflow_dispatch:
+    inputs:
+      device-id:
+        description: Device
+        required: true
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, x64]
+    permissions:
+      contents: write
+    steps:
+      - run: echo "hello"
