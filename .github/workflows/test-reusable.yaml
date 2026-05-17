@@ -1,12 +1,10 @@
-name: 测试调用 complex-expr
+name: 调用测试A
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-complex:
-    uses: ./.github/workflows/test-complex-expr.yaml
+  call-a:
+    uses: ./.github/workflows/test-expr-a.yaml
     with:
       device-id: shiba
-      magisk-preinit-device: sda10
-    secrets: inherit
