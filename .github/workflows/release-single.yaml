@@ -76,8 +76,7 @@ jobs:
   build-device:
     runs-on: [self-hosted, linux, x64]
     timeout-minutes: 45
-    permissions:
-      contents: write
+
     steps:
       - uses: actions/checkout@v6
         with:
