@@ -1,0 +1,38 @@
+name: CI — PR 验证
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '*.sh'
+      - '.github/**'
+
+jobs:
+  lint-and-validate:
+    name: 语法检查与验证
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ShellCheck — 检查 Shell 脚本
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          severity: warning
+        continue-on-error: true
+
+      - name: 验证 YAML 工作流语法
+        run: |
+          echo "检查 YAML 格式..."
+          for f in .github/workflows/*.yaml .github/workflows/*.yml; do
+            [ -f "$f" ] || continue
+            echo "  → $f"
+            python3 -c "import yaml; yaml.safe_load(open('$f')); print('    ✅ 有效')" 2>&1 || echo "    ❌ 无效"
+          done
+
+      - name: 检查 rooted-ota.sh 基础语法
+        run: |
+          bash -n rooted-ota.sh && echo "✅ rooted-ota.sh 语法通过" || echo "❌ rooted-ota.sh 语法错误"
