@@ -1,0 +1,31 @@
+name: 测试 - 加 cache restore
+
+on:
+  workflow_call:
+    inputs:
+      device-id:
+        type: string
+  workflow_dispatch:
+    inputs:
+      device-id:
+        description: Device
+        required: true
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, x64]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: 恢复工具缓存
+        id: cache-tools-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: .tool-cache
+          key: tool-cache-${{ runner.os }}-v1
+      - name: 设置输入参数
+        run: |
+          echo "DEVICE_ID=${{ inputs.device-id }}"
