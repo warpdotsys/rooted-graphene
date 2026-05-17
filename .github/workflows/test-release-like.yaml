@@ -1,0 +1,43 @@
+name: 测试 - release-single-like
+
+on:
+  workflow_call:
+    inputs:
+      device-id:
+        type: string
+      magisk-preinit-device:
+        type: string
+        default: ''
+      ksu-version:
+        type: string
+        default: ''
+      ksu-kmi:
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      device-id:
+        description: 设备 ID
+        required: true
+      magisk-preinit-device:
+        description: Magisk preinit
+        required: false
+      ksu-version:
+        description: KernelSU version
+        required: false
+        default: 'latest'
+      ksu-kmi:
+        description: KMI
+        required: false
+
+jobs:
+  build-device:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: 设置输入参数
+        run: |
+          echo "DEVICE_ID=${{ inputs.device-id }}"
