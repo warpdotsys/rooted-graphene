@@ -1,11 +1,11 @@
-name: 测试调用 self-hosted reusable
+name: 测试调用 nopush reusable
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-selfhosted:
-    uses: ./.github/workflows/test-release-selfhosted.yaml
+  test-nopush:
+    uses: ./.github/workflows/test-release-nopush.yaml
     with:
       device-id: shiba
       magisk-preinit-device: sda10
