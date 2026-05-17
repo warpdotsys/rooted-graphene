@@ -131,7 +131,13 @@ function saveToolCache() {
       count=$((count + 1))
     fi
   done
-  print "已保存 $count 个工具到 .tool-cache/"
+  # 缓存 OTA 包（只保留该设备最新一个）
+  if [ -n "$OTA_TARGET" ] && [ -f ".tmp/$OTA_TARGET.zip" ]; then
+    rm -f ".tool-cache/${DEVICE_ID}-ota-"*.zip
+    cp ".tmp/$OTA_TARGET.zip" ".tool-cache/${DEVICE_ID}-ota-${OTA_VERSION}.zip"
+    count=$((count + 1))
+  fi
+  print "已保存 $count 个工具/包到 .tool-cache/"
 }
 
 # 解析自动检测标记 "auto"，将 *_VERSION=auto 的变量替换为实际最新版本
