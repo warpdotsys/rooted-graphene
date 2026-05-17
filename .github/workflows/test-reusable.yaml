@@ -5,7 +5,7 @@ on:
 
 jobs:
   test:
-    uses: ./.github/workflows/test-s3.yaml
+    uses: ./.github/workflows/test-3a.yaml
     with:
       device-id: shiba
     secrets: inherit
