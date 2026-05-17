@@ -1,10 +1,10 @@
-name: 调用测试A
+name: 调用测试B
 
 on:
   workflow_dispatch:
 
 jobs:
-  call-a:
-    uses: ./.github/workflows/test-expr-a.yaml
+  call-b:
+    uses: ./.github/workflows/test-expr-b.yaml
     with:
       device-id: shiba
