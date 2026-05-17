@@ -1,0 +1,14 @@
+name: 简单可复用
+
+on:
+  workflow_call:
+    inputs:
+      device:
+        type: string
+        required: true
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "device=${{ inputs.device }}"
