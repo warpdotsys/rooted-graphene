@@ -122,9 +122,9 @@ jobs:
       - name: 发布
         env:
           GITHUB_REPO: ${{ github.repository }}
-          KEY_AVB_BASE64: ${{ vars.KEY_AVB_BASE64 }}
-          CERT_OTA_BASE64: ${{ vars.CERT_OTA_BASE64 }}
-          KEY_OTA_BASE64: ${{ vars.KEY_OTA_BASE64 }}
+          KEY_AVB_BASE64: ${{ secrets.KEY_AVB_BASE64 }}
+          CERT_OTA_BASE64: ${{ secrets.CERT_OTA_BASE64 }}
+          KEY_OTA_BASE64: ${{ secrets.KEY_OTA_BASE64 }}
           PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
           PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
         run: |
