@@ -1,11 +1,11 @@
-name: 测试调用 nopush reusable
+name: 测试调用 complex-expr
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-nopush:
-    uses: ./.github/workflows/test-release-nopush.yaml
+  test-complex:
+    uses: ./.github/workflows/test-complex-expr.yaml
     with:
       device-id: shiba
       magisk-preinit-device: sda10
