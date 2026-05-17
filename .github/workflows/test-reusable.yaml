@@ -1,11 +1,11 @@
-name: 测试调用 release-like
+name: 测试调用 self-hosted reusable
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-like:
-    uses: ./.github/workflows/test-release-like.yaml
+  test-selfhosted:
+    uses: ./.github/workflows/test-release-selfhosted.yaml
     with:
       device-id: shiba
       magisk-preinit-device: sda10
