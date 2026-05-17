@@ -60,7 +60,7 @@ SKIP_MODULES=${SKIP_MODULES:-'false'}
 UPLOAD_TEST_OTA=${UPLOAD_TEST_OTA:-false}
 
 # KernelSU 支持：设为版本号（如 'v3.2.4'）或 'latest' 来启用 KSU flavor
-KSU_VERSION=${KSU_VERSION:-''}
+KSU_VERSION=${KSU_VERSION:-latest}
 # KMI（Kernel Module Interface），留空则自动检测
 KSU_KMI=${KSU_KMI:-''}
 # 默认允许通过 KernelSU 进行 shell 级 root 访问
@@ -216,12 +216,10 @@ function checkBuildNecessary() {
   currentCommit=$(git rev-parse --short HEAD)
   POTENTIAL_ASSETS=()
     
-  if [[ -n "$MAGISK_PREINIT_DEVICE" ]]; then 
-    # 例如: oriole-2023121200-magisk-v26.4-4647f74-dirty.zip
-    POTENTIAL_ASSETS['magisk']="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}-magisk-${MAGISK_VERSION}$(createAssetSuffix).zip"
-  else 
-    printGreen "未设置 MAGISK_PREINIT_DEVICE，跳过 Magisk OTA 构建"
-  fi
+  # Magisk preinit 分区将在 OTA 下载后从 boot.img 自动检测
+  # 如需手动指定，设置 MAGISK_PREINIT_DEVICE 环境变量
+  POTENTIAL_ASSETS['magisk']="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}-magisk-${MAGISK_VERSION}$(createAssetSuffix).zip"
+  
   
   if [[ "$SKIP_ROOTLESS" != 'true' ]]; then
     POTENTIAL_ASSETS['rootless']="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}-rootless$(createAssetSuffix).zip"
@@ -396,6 +394,38 @@ function patchOTAs() {
 
   base642key
 
+  # --------------- 从 boot.img 自动检测 KMI 和 Magisk preinit ---------------
+  if [[ -z "$KSU_KMI" ]] || [[ -z "$MAGISK_PREINIT_DEVICE" ]]; then
+    local otaZip=".tmp/$OTA_TARGET.zip"
+    if [ -f "$otaZip" ]; then
+      downloadMagiskBoot
+      print "正在从 OTA 提取 boot.img 以检测设备参数..."
+      local detectDir=".tmp/preinit_detect"
+      mkdir -p "$detectDir/boot_extracted"
+      .tmp/avbroot ota extract \
+        --input "$otaZip" \
+        --directory "$detectDir/boot_extracted" \
+        --boot-only 2>/dev/null || true
+      local bootImg="$detectDir/boot_extracted/boot.img"
+      if [ -f "$bootImg" ]; then
+        DETECTED_KMI=""
+        DETECTED_PREINIT=""
+        detectDeviceParams "$bootImg"
+        if [[ -z "$KSU_KMI" ]] && [[ -n "$DETECTED_KMI" ]]; then
+          KSU_KMI="$DETECTED_KMI"
+          printGreen "自动检测到 KSU_KMI: $KSU_KMI"
+        fi
+        if [[ -z "$MAGISK_PREINIT_DEVICE" ]] && [[ -n "$DETECTED_PREINIT" ]]; then
+          MAGISK_PREINIT_DEVICE="$DETECTED_PREINIT"
+          printGreen "自动检测到 MAGISK_PREINIT_DEVICE: $MAGISK_PREINIT_DEVICE"
+        fi
+      else
+        printYellow "无法从 OTA 提取 boot.img，将尝试在后续步骤中检测"
+      fi
+      rm -rf "$detectDir"
+    fi
+  fi
+
   # 对 rootless/magisk flavor 执行标准的 Docker 修补流程。
   # KSU 作为后处理步骤单独处理（见下方），在此循环中被跳过。
   for flavor in "${!POTENTIAL_ASSETS[@]}"; do
@@ -563,9 +593,9 @@ import shutil; shutil.rmtree('lib', ignore_errors=True)
   printGreen "magiskboot 提取完成"
 }
 
-function detectKsuKmi() {
+function detectDeviceParams() {
   local bootImg="$1"
-  local workDir=".tmp/ksu_kmi_detect"
+  local workDir=".tmp/device_detect"
   rm -rf "$workDir"
   mkdir -p "$workDir"
 
@@ -577,8 +607,9 @@ function detectKsuKmi() {
   if [ ! -f "$kernelFile" ]; then
     printRed "无法从 boot.img 提取内核（magiskboot 无法解包）" >&2
     rm -rf "$workDir"
-    echo "unknown"
-    return
+    DETECTED_KMI=""
+    DETECTED_PREINIT=""
+    return 1
   fi
 
   # 读取内核版本字符串
@@ -588,8 +619,9 @@ function detectKsuKmi() {
 
   if [ -z "$kernelVer" ]; then
     printRed "无法从 boot.img 检测内核版本" >&2
-    echo "unknown"
-    return
+    DETECTED_KMI=""
+    DETECTED_PREINIT=""
+    return 1
   fi
 
   print "内核版本: $kernelVer"
@@ -599,27 +631,38 @@ function detectKsuKmi() {
   major=$(echo "$kernelVer" | sed 's/Linux version //' | cut -d'.' -f1)
   minor=$(echo "$kernelVer" | sed 's/Linux version //' | cut -d'.' -f2)
 
-  # 将内核版本映射到 KMI
-  # 参见 https://kernelsu.org/guide/installation.html#kmi
-  local kmi=""
+  # 将内核版本映射到 KMI 和 Magisk preinit 分区
   case "${major}.${minor}" in
-    "5.10") kmi="android12-5.10" ;;
+    "5.10")
+      DETECTED_KMI="android12-5.10"
+      DETECTED_PREINIT="metadata"
+      ;;
     "5.15")
-      # 检查是 android13 还是 android14：android13-5.15 更常见
-      # 但较新的 Pixel 设备（内核 5.15）可能使用 android14-5.15
-      # 默认使用 android13-5.15 以获得更广的兼容性
-      kmi="android13-5.15" ;;
-    "6.1")  kmi="android14-6.1" ;;
-    "6.6")  kmi="android15-6.6" ;;
-    "6.12") kmi="android16-6.12" ;;
+      DETECTED_KMI="android13-5.15"
+      DETECTED_PREINIT="metadata"
+      ;;
+    "6.1")
+      DETECTED_KMI="android14-6.1"
+      DETECTED_PREINIT="sda10"
+      ;;
+    "6.6")
+      DETECTED_KMI="android15-6.6"
+      DETECTED_PREINIT="sda10"
+      ;;
+    "6.12")
+      DETECTED_KMI="android16-6.12"
+      DETECTED_PREINIT="sda10"
+      ;;
     *)
-      printRed "未知内核版本 ${major}.${minor}，无法确定 KMI"
-      echo "unknown"
-      return
+      printRed "未知内核版本 ${major}.${minor}，无法检测设备参数" >&2
+      DETECTED_KMI=""
+      DETECTED_PREINIT=""
+      return 1
       ;;
   esac
 
-  echo "$kmi"
+  printGreen "检测到 KMI: $DETECTED_KMI, preinit: $DETECTED_PREINIT"
+  return 0
 }
 
 function injectKsuIntoOta() {
@@ -647,13 +690,15 @@ function injectKsuIntoOta() {
   local kmi="${KSU_KMI}"
   if [ -z "$kmi" ]; then
     print "正在从 boot.img 自动检测 KMI..."
-    kmi=$(detectKsuKmi "$workDir/extracted/boot.img")
-    kmi=$(echo "$kmi" | tr -d '[:space:]')  # 清理可能的空白
-    if [ -z "$kmi" ] || [ "$kmi" = "unknown" ]; then
+    DETECTED_KMI=""
+    DETECTED_PREINIT=""
+    detectDeviceParams "$workDir/extracted/boot.img"
+    kmi="$DETECTED_KMI"
+    if [ -z "$kmi" ]; then
       printYellow "KMI 自动检测失败，使用设备默认值"
       case "$DEVICE_ID" in
         shiba|husky|akita)  kmi="android14-6.1" ;;  # Pixel 8 系列
-        komodo|caiman)      kmi="android15-6.6" ;;  # Pixel 9 系列
+        tokay|caiman|komodo) kmi="android15-6.6" ;;  # Pixel 9 系列
         *)                  kmi="android14-6.1" ;;  # 通用回退
       esac
       print "默认 KMI: $kmi"
