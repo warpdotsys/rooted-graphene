@@ -84,7 +84,7 @@ jobs:
           fetch-depth: 0
       - name: 恢复工具缓存
         id: cache-tools-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .tool-cache
           key: tool-cache-${{ runner.os }}-v1
@@ -137,7 +137,7 @@ jobs:
         if: always()
         run: ls -la .tool-cache/ 2>&1 || echo "NO TOOL-CACHE DIR"
       - name: 保存工具缓存（成功时）
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         continue-on-error: true
         with:
           path: .tool-cache
