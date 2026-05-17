@@ -1,12 +1,10 @@
-name: 测试可复用调用
+name: 测试调用简单可复用
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-call:
-    uses: ./.github/workflows/release-single.yaml
+  test-simple:
+    uses: ./.github/workflows/simple-reusable.yaml
     with:
-      device-id: shiba
-      magisk-preinit-device: sda10
-    secrets: inherit
+      device: shiba
