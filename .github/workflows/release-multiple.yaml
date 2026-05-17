@@ -28,6 +28,9 @@ on:
         required: false
         default: false
 
+permissions:
+  contents: write
+
 jobs:
   build-shiba-ksu:
     name: "shiba (Pixel 8) — KernelSU"
