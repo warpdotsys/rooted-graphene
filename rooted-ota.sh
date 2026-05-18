@@ -834,7 +834,13 @@ function releaseOta() {
   
   for flavor in "${!POTENTIAL_ASSETS[@]}"; do
     local assetName="${POTENTIAL_ASSETS[$flavor]}"
-    uploadFile ".tmp/$assetName" "$assetName" "application/zip"
+    local assetPath=".tmp/$assetName"
+    # GitHub Release 单文件限制 ~2GB，超限则跳过
+    if [ -f "$assetPath" ] && [ "$(stat -c%s "$assetPath")" -gt 2147483648 ]; then
+      printYellow "跳过上传 ${assetName}（文件 >2GB，GitHub Release 不支持）"
+      continue
+    fi
+    uploadFile "$assetPath" "$assetName" "application/zip"
   done
 }
 
@@ -900,12 +906,19 @@ function uploadFile() {
   local sourceFileName="$1"
   local targetFileName="$2"
   local contentType="$3"
-
+  if [ ! -f "$sourceFileName" ]; then
+    printYellow "文件不存在，跳过上传: $sourceFileName"
+    return
+  fi
   # 注意 --data-binary 可能导致内存溢出
   curl --fail -X POST -H "Authorization: token $GITHUB_TOKEN" \
     -H "Content-Type: $contentType" \
     --upload-file "$sourceFileName" \
-    "https://uploads.github.com/repos/$GITHUB_REPO/releases/$RELEASE_ID/assets?name=$targetFileName"
+    "https://uploads.github.com/repos/$GITHUB_REPO/releases/$RELEASE_ID/assets?name=$targetFileName" || {
+    local rc=$?
+    printYellow "上传 ${targetFileName} 到 Release 失败（exit $rc），继续执行"
+    return
+  }
 }
 
 function createOtaServerData() {
