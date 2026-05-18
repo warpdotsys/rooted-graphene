@@ -37,7 +37,8 @@ jobs:
     uses: ./.github/workflows/release-single.yaml
     with:
       device-id: shiba
-      magisk-preinit-device: sda10
+      magisk-preinit-device: ''
       ksu-version: ${{ (github.event_name == 'workflow_dispatch' && inputs.ksu-version) || 'latest' }}
       ksu-kmi: ${{ (github.event_name == 'workflow_dispatch' && inputs.ksu-kmi) || '' }}
+      lenient-check: true
     secrets: inherit

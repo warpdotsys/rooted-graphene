@@ -263,8 +263,15 @@ function checkBuildNecessary() {
       local selectedAsset POTENTIAL_ASSET_NAME="${POTENTIAL_ASSETS[$flavor]}"
       print "检查制品是否已存在: ${POTENTIAL_ASSET_NAME}"
       
-      # 匹配资产名称时包含当前 commit hash，确保脚本变更后重新构建
-      selectedAsset=$(echo "${response}" | jq -r --arg assetPrefix "${DEVICE_ID}-${OTA_VERSION}-${currentCommit}" \
+      # 严格模式（默认）：包含 commit hash，确保脚本变更后重新构建
+      # 宽松模式（CHECK_LENIENT=true）：只按 OTA 版本匹配，适合每日自动构建
+      local assetPrefix
+      if [[ "${CHECK_LENIENT:-false}" == 'true' ]]; then
+        assetPrefix="${DEVICE_ID}-${OTA_VERSION}"
+      else
+        assetPrefix="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}"
+      fi
+      selectedAsset=$(echo "${response}" | jq -r --arg assetPrefix "$assetPrefix" \
         '.assets[] | select(.name | startswith($assetPrefix)) | .name' \
           | grep "${flavor}" || true)
   

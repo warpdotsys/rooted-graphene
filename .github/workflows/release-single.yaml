@@ -26,6 +26,10 @@ on:
       ksu-kmi:
         type: string
         default: ''
+      lenient-check:
+        description: 宽松跳过（同 OTA 版本有任意 asset 就跳过，不检查 commit hash）
+        type: boolean
+        default: false
   
   # 允许从 Actions 标签页手动触发
   workflow_dispatch:
@@ -109,6 +113,10 @@ jobs:
           echo "SKIP_RELEASE=$(echo '${{ github.event.inputs.skip-release || '' }}' | xargs)" >> $GITHUB_ENV
           echo "KSU_VERSION=$(echo '${{ github.event.inputs.ksu-version || inputs.ksu-version || '' }}' | xargs)" >> $GITHUB_ENV
           echo "KSU_KMI=$(echo '${{ github.event.inputs.ksu-kmi || inputs.ksu-kmi || '' }}' | xargs)" >> $GITHUB_ENV
+          
+          # 宽松跳过：schedule/多设备自动构建时不检查 commit hash
+          IS_LENIENT='${{ inputs.lenient-check }}'
+          echo "CHECK_LENIENT=${IS_LENIENT:-false}" >> $GITHUB_ENV
           
           if [[ "${{ github.event_name }}" == "push" ]]  || [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "在 push 上运行：仅构建不发布，设备 $DEVICE_ID"
