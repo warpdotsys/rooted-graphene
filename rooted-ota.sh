@@ -150,6 +150,11 @@ function initDependencyVersions() {
   [[ "$AFSR_VERSION" == "auto" ]] && AFSR_VERSION=$(fetchLatestGithubTag "chenxiaolong/afsr" "1.0.4")
   [[ "$PATCH_PY_COMMIT" == "auto" ]] && PATCH_PY_COMMIT=$(fetchLatestCommit "chenxiaolong/my-avbroot-setup" "master" "84139189c8cbe244a676582a3b3517f31fabc421")
 
+  # 统一规范化 Magisk 版本号：确保始终以 v 开头（GitHub Release tag 格式）
+  if [[ -n "$MAGISK_VERSION" ]] && [[ "$MAGISK_VERSION" != v* ]]; then
+    MAGISK_VERSION="v${MAGISK_VERSION}"
+  fi
+
   print "已检测依赖版本: Magisk=$MAGISK_VERSION avbroot=$AVB_ROOT_VERSION Custota=$CUSTOTA_VERSION OEMUnlockOnBoot=$OEMUNLOCKONBOOT_VERSION afsr=$AFSR_VERSION"
 }
 
@@ -342,6 +347,8 @@ function findLatestVersion() {
   # 解析 "latest" 或 "auto" 标记为实际最新版本
   if [[ "$MAGISK_VERSION" == 'latest' ]] || [[ "$MAGISK_VERSION" == 'auto' ]]; then
     MAGISK_VERSION=$(curl --fail -sL -I -o /dev/null -w '%{url_effective}' https://github.com/topjohnwu/Magisk/releases/latest | sed 's/.*\/tag\///;')
+    # 规范化：确保以 v 开头
+    [[ "$MAGISK_VERSION" != v* ]] && MAGISK_VERSION="v${MAGISK_VERSION}"
   fi
   print "Magisk 版本: $MAGISK_VERSION"
 
