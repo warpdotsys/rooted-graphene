@@ -597,36 +597,29 @@ import shutil; shutil.rmtree('lib', ignore_errors=True)
 
 function detectDeviceParams() {
   local bootImg="$1"
-  local workDir=".tmp/device_detect"
-  rm -rf "$workDir"
-  mkdir -p "$workDir"
+  local kernelVer=""
 
-  # magiskboot unpack 解压到当前目录，不支持 -d 参数
-  # 所以需要在工作目录的子 shell 中运行
-  (cd "$workDir" && ../magiskboot unpack "../$bootImg" >/dev/null 2>&1) || true
+  # 方案一：直接从 boot.img 原始字节中读取内核版本（无需解包）
+  kernelVer=$(strings "$bootImg" | grep -E '^Linux version [0-9]+\.[0-9]+' | head -1)
 
-  # 尝试多个可能的 kernel 文件名（GKI 格式可能不同）
-  local kernelFile
-  for f in kernel kernel.gz Image Image.gz Image.lz4; do
-    if [ -f "$workDir/$f" ]; then
-      kernelFile="$workDir/$f"
-      break
-    fi
-  done
-
-  if [ -z "$kernelFile" ]; then
-    printYellow "无法从 boot.img 提取内核（magiskboot 无法解包），将使用默认值" >&2
+  # 方案二：兜底——magiskboot 解包后从内核文件中读取
+  if [ -z "$kernelVer" ]; then
+    local workDir=".tmp/device_detect"
     rm -rf "$workDir"
-    # 找不到内核时设为默认值（兼容模式）
-    DETECTED_KMI=""
-    DETECTED_PREINIT=""
-    return 1
+    mkdir -p "$workDir"
+    (cd "$workDir" && ../magiskboot unpack "../$bootImg" >/dev/null 2>&1) || true
+    local kernelFile=""
+    for f in kernel kernel.gz Image Image.gz Image.lz4; do
+      if [ -f "$workDir/$f" ]; then
+        kernelFile="$workDir/$f"
+        break
+      fi
+    done
+    if [ -n "$kernelFile" ]; then
+      kernelVer=$(strings "$kernelFile" | grep -E '^Linux version [0-9]+\.[0-9]+' | head -1)
+    fi
+    rm -rf "$workDir"
   fi
-
-  # 读取内核版本字符串
-  local kernelVer
-  kernelVer=$(strings "$kernelFile" | grep -E '^Linux version [0-9]+\.[0-9]+' | head -1)
-  rm -rf "$workDir"
 
   if [ -z "$kernelVer" ]; then
     printYellow "无法从 boot.img 检测内核版本，将使用默认值" >&2
