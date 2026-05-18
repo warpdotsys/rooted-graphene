@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # 项目根目录绝对路径（供子进程切换工作目录后仍能引用）
-readonly PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+_project_root="$(cd "$(dirname "$0")" && pwd)"
+readonly PROJECT_ROOT="$_project_root"
 
 # 需要 git、jq 和 curl
 
