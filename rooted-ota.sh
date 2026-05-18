@@ -600,7 +600,8 @@ function detectDeviceParams() {
   local kernelVer=""
 
   # 方案一：直接从 boot.img 原始字节中读取内核版本（无需解包）
-  kernelVer=$(strings "$bootImg" | grep -E '^Linux version [0-9]+\.[0-9]+' | head -1)
+  # 先尝试严格匹配，再宽松匹配
+  kernelVer=$(strings "$bootImg" | grep -E 'Linux version [0-9]+\.[0-9]+' | head -1)
 
   # 方案二：兜底——magiskboot 解包后从内核文件中读取
   if [ -z "$kernelVer" ]; then
@@ -621,51 +622,45 @@ function detectDeviceParams() {
     rm -rf "$workDir"
   fi
 
-  if [ -z "$kernelVer" ]; then
-    printYellow "无法从 boot.img 检测内核版本，将使用默认值" >&2
-    DETECTED_KMI=""
-    DETECTED_PREINIT=""
-    return 1
+  if [ -n "$kernelVer" ]; then
+    print "内核版本: $kernelVer"
+    local major minor
+    major=$(echo "$kernelVer" | sed 's/.*Linux version //' | cut -d'.' -f1)
+    minor=$(echo "$kernelVer" | sed 's/.*Linux version //' | cut -d'.' -f2)
+
+    case "${major}.${minor}" in
+      "5.10") DETECTED_KMI="android12-5.10"; DETECTED_PREINIT="metadata";;
+      "5.15") DETECTED_KMI="android13-5.15"; DETECTED_PREINIT="metadata";;
+      "6.1")  DETECTED_KMI="android14-6.1";  DETECTED_PREINIT="sda10";;
+      "6.6")  DETECTED_KMI="android15-6.6";  DETECTED_PREINIT="sda10";;
+      "6.12") DETECTED_KMI="android16-6.12"; DETECTED_PREINIT="sda10";;
+      *)
+        printRed "未知内核版本 ${major}.${minor}" >&2
+        DETECTED_KMI=""; DETECTED_PREINIT=""
+        return 1;;
+    esac
+    printGreen "检测到 KMI: $DETECTED_KMI, preinit: $DETECTED_PREINIT"
+    return 0
   fi
 
-  print "内核版本: $kernelVer"
-
-  # 解析主版本.次版本
-  local major minor
-  major=$(echo "$kernelVer" | sed 's/Linux version //' | cut -d'.' -f1)
-  minor=$(echo "$kernelVer" | sed 's/Linux version //' | cut -d'.' -f2)
-
-  # 将内核版本映射到 KMI 和 Magisk preinit 分区
-  case "${major}.${minor}" in
-    "5.10")
-      DETECTED_KMI="android12-5.10"
-      DETECTED_PREINIT="metadata"
-      ;;
-    "5.15")
-      DETECTED_KMI="android13-5.15"
-      DETECTED_PREINIT="metadata"
-      ;;
-    "6.1")
+  # 方案三：检测完全失败，使用设备已知参数
+  printYellow "无法从 boot.img 检测内核版本，使用设备已知参数" >&2
+  case "${DEVICE_ID}" in
+    shiba|husky|felix|tangorpro|akita|caiman|komodo|tokay)
       DETECTED_KMI="android14-6.1"
       DETECTED_PREINIT="sda10"
       ;;
-    "6.6")
-      DETECTED_KMI="android15-6.6"
-      DETECTED_PREINIT="sda10"
-      ;;
-    "6.12")
-      DETECTED_KMI="android16-6.12"
-      DETECTED_PREINIT="sda10"
+    panther|cheetah|bluejay|lynx|eos)
+      DETECTED_KMI="android13-5.15"
+      DETECTED_PREINIT="metadata"
       ;;
     *)
-      printRed "未知内核版本 ${major}.${minor}，无法检测设备参数" >&2
-      DETECTED_KMI=""
-      DETECTED_PREINIT=""
-      return 1
+      printYellow "未知设备 $DEVICE_ID，使用通用默认值" >&2
+      DETECTED_KMI="android14-6.1"
+      DETECTED_PREINIT="sda10"
       ;;
   esac
-
-  printGreen "检测到 KMI: $DETECTED_KMI, preinit: $DETECTED_PREINIT"
+  printYellow "使用设备默认值: KMI=$DETECTED_KMI, preinit=$DETECTED_PREINIT" >&2
   return 0
 }
 
