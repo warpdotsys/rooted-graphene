@@ -327,7 +327,12 @@ function downloadAndroidDependencies() {
   fi
 
   if ! ls ".tmp/$OTA_TARGET.zip" >/dev/null 2>&1; then
-    curl --fail -sLo ".tmp/$OTA_TARGET.zip" "$OTA_URL"
+    if [[ -n "$PRESEED_OTA_DIR" ]] && [ -f "$PRESEED_OTA_DIR/$OTA_TARGET.zip" ]; then
+      cp "$PRESEED_OTA_DIR/$OTA_TARGET.zip" ".tmp/$OTA_TARGET.zip"
+      printGreen "从预置目录复制了 OTA: $PRESEED_OTA_DIR/$OTA_TARGET.zip"
+    else
+      curl --fail -sLo ".tmp/$OTA_TARGET.zip" "$OTA_URL"
+    fi
   fi
 }
 
