@@ -77,6 +77,12 @@ on:
       magisk-version:
         description: Magisk 版本
         required: false
+
+# 新 push 自动取消前一个正在运行的构建，避免资源浪费
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}
+  cancel-in-progress: true
+
 jobs:
   build-device:
     runs-on: [self-hosted, linux, x64]
@@ -138,14 +144,15 @@ jobs:
           PRESEED_OTA_DIR: /opt/actions-runner/_work/rooted-graphene/.ota-cache
         run: |
           if [[ $SKIP_RELEASE == 'true' ]]; then
-            DEBUG=1 bash -c '. rooted-ota.sh && createRootedOta && createOtaServerData'
+            DEBUG=1 SKIP_CLEANUP=true bash -c '. rooted-ota.sh && createRootedOta && createOtaServerData'
           else
-            DEBUG=1 bash -c '. rooted-ota.sh && createAndReleaseRootedOta'
+            DEBUG=1 SKIP_CLEANUP=true bash -c '. rooted-ota.sh && createAndReleaseRootedOta'
           fi
       - name: 调试 — 检查缓存保存目录
         if: always()
         run: ls -la .tool-cache/ 2>&1 || echo "NO TOOL-CACHE DIR"
       - name: 保存工具缓存（成功时）
+        if: always()
         uses: actions/cache/save@v5
         continue-on-error: true
         with:
