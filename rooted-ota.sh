@@ -119,7 +119,7 @@ function initToolCache() {
     print "工具缓存不存在，将在线下载"
   fi
   # 从预置目录加载 OTA zip（如果有），也立即缓存到 .tool-cache
-  if [[ -n "$PRESEED_OTA_DIR" ]] && [[ -n "$OTA_TARGET" ]] && [ -f "$PRESEED_OTA_DIR/$OTA_TARGET.zip" ]; then
+  if [[ -n "$PRESEED_OTA_DIR" ]] && [[ -n "${OTA_TARGET:-}" ]] && [ -f "$PRESEED_OTA_DIR/$OTA_TARGET.zip" ]; then
     mkdir -p .tmp .tool-cache
     cp "$PRESEED_OTA_DIR/$OTA_TARGET.zip" ".tmp/$OTA_TARGET.zip"
     cp ".tmp/$OTA_TARGET.zip" ".tool-cache/$OTA_TARGET.zip"
@@ -140,8 +140,8 @@ function saveToolCache() {
     fi
   done
   # 缓存 OTA 包（只保留该设备最新一个）
-  if [ -n "$OTA_TARGET" ] && [ -f ".tmp/$OTA_TARGET.zip" ]; then
-    rm -f ".tool-cache/${DEVICE_ID}-ota-"*.zip
+  if [ -n "${OTA_TARGET:-}" ] && [ -f ".tmp/${OTA_TARGET:-}.zip" ]; then
+    rm -f ".tool-cache/${DEVICE_ID:-}-ota-"*.zip
     cp ".tmp/$OTA_TARGET.zip" ".tool-cache/$OTA_TARGET.zip"
     count=$((count + 1))
   fi
