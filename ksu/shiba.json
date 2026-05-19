@@ -1,7 +1,0 @@
-{
-  "version": 2,
-  "full": {
-    "location_ota": "https://github.com/warpdotsys/rooted-graphene/releases/download/2026050901/shiba-2026050901-a022e5b-ksu-latest.zip",
-    "location_csig": "https://github.com/warpdotsys/rooted-graphene/releases/download/2026050901/shiba-2026050901-a022e5b-ksu-latest.zip.csig"
-  }
-}
