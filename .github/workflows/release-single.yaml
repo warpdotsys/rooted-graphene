@@ -17,6 +17,7 @@ on:
     inputs:
       device-id:
         type: string
+        default: 'shiba'
       magisk-preinit-device:
         type: string
         default: ''
@@ -35,8 +36,9 @@ on:
   workflow_dispatch:
     inputs:
       device-id:
-        description: 设备 ID
-        required: true
+        description: 设备 ID（留空默认 shiba）
+        required: false
+        default: 'shiba'
       magisk-preinit-device:
         description: Magisk preinit 设备分区（留空则跳过 Magisk）
         required: false

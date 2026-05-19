@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
-# rooted-pixel — 使用 KernelSU (或 Magisk) 修补 Pixel 出厂 OTA 镜像，
+# rooted-graphene — 使用 KernelSU (或 Magisk) 修补 GrapheneOS OTA 镜像，
 # 支持 AVB 验证、锁定 Bootloader 和 Root 权限。
 # 通过 Custota 和自建 OTA 服务器进行无线升级。
 #
-# 基于 rooted-graphene (https://github.com/warpdotsys/rooted-graphene) 修改
 # Copyright 2024-2026 参见 LICENSE
 # Workflow 位置: .github/workflows/release-single.yaml
 
@@ -33,7 +32,7 @@ if [[ -n "${DEBUG}" ]]; then set -x; fi
 # ============================================================
 # 必填参数
 # ============================================================
-DEVICE_ID=${DEVICE_ID:-}           # Pixel 设备代号，如 shiba (Pixel 8)
+DEVICE_ID=${DEVICE_ID:-}           # GrapheneOS 设备代号，如 shiba
 GITHUB_TOKEN=${GITHUB_TOKEN:-''}
 GITHUB_REPO=${GITHUB_REPO:-''}
 
@@ -42,7 +41,7 @@ GITHUB_REPO=${GITHUB_REPO:-''}
 # ============================================================
 MAGISK_PREINIT_DEVICE=${MAGISK_PREINIT_DEVICE:-}
 SKIP_ROOTLESS=${SKIP_ROOTLESS:-'false'}
-OTA_VERSION=${OTA_VERSION:-'latest'}   # 可指定 Build ID，如 AP4A.250205.002
+OTA_VERSION=${OTA_VERSION:-'latest'}   # 可指定版本号，如 2026050900
 
 MAGISK_VERSION=${MAGISK_VERSION:-auto} # renovate: datasource=github-releases packageName=topjohnwu/Magisk versioning=semver-coerced
 
@@ -70,12 +69,12 @@ CHECK_LENIENT=${CHECK_LENIENT:-'false'}
 RELEASE_ID=''
 
 # ============================================================
-# Pixel 出厂 OTA 源
+# GrapheneOS OTA 源
 # ============================================================
-# Pixel 出厂镜像托管在 Google 的 dl.google.com
-OTA_BASE_URL="https://dl.google.com/dl/android/aosp"
-# 设备数据库：维护设备代号到已知 OTA URL 的映射
-DEVICES_JSON="${PROJECT_ROOT}/devices.json"
+# GrapheneOS OTA 镜像托管在 releases.grapheneos.org
+# 格式: {device}-ota-{version}.zip，版本号如 2026050900
+OTA_BASE_URL="https://releases.grapheneos.org"
+OTA_CHANGES_URL="https://grapheneos.org/releases"
 
 # 以下版本默认自动检测最新版，失败时回退到列出的版本号
 AVB_ROOT_VERSION=${AVB_ROOT_VERSION:-auto}        # 回退: 3.29.1
@@ -192,62 +191,48 @@ function createAssetSuffix() {
 }
 
 # ============================================================
-# 直接抓取 Google OTA 页面（参照 auto_ota_manual_patch.sh）
+# 抓取 GrapheneOS 最新版本号
 # ============================================================
+# GrapheneOS 版本号格式: YYYYMMDDNN (如 2026050900)
+# OTA zip 格式: {device}-ota-{version}.zip
+# 源: https://releases.grapheneos.org/
 
-function fetchPixelOtaUrl() {
+function fetchGrapheneOSVersion() {
   local device="$1"
-  local version_filter="${2:-}"
-  local page_file=".tmp/ota_page.html"
-  local ua="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  local releases_url="https://grapheneos.org/releases"
 
-  # 确保临时目录存在（CI 中工具缓存为空时 .tmp 可能未创建）
   mkdir -p .tmp
 
-  echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): 正在抓取 Google OTA 页面（device=$device, version=${version_filter:-latest}）..."
+  echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): 正在获取 GrapheneOS 最新版本（device=$device）..."
 
-  # 不设 --fail：即使 Google 返回非 200（如 302/401）也下载页面内容。
-  # --retry 增加网络容错性。
-  curl -sL -H "Cookie: devsite_wall_acks=nexus-ota-tos" \
-    -A "$ua" \
-    --retry 3 --retry-delay 2 \
-    -o "$page_file" \
-    "https://developers.google.com/android/ota?hl=zh-cn" 2>/dev/null || {
-    local rc=$?
+  local page_file=".tmp/gos_releases.html"
+  curl -sL --retry 3 --retry-delay 2 -o "$page_file" "$releases_url" 2>/dev/null || {
     rm -f "$page_file"
-    echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): curl 请求失败（exit code=$rc）"
+    echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): 获取 GrapheneOS releases 页面失败"
     return 1
   }
 
-  local page_size
-  page_size=$(stat -c%s "$page_file" 2>/dev/null || echo 0)
-  echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): OTA 页面已下载（${page_size} 字节）"
-
-  local url=""
-  if [ -n "$version_filter" ]; then
-    local filter_lc
-    filter_lc=$(echo "$version_filter" | tr '[:upper:]' '[:lower:]')
-    url=$(grep -o "https://dl.google.com/dl/android/aosp/${device}-ota-${filter_lc}-[a-f0-9]*\.zip" "$page_file" 2>/dev/null | tail -1)
-  fi
-  if [ -z "$url" ]; then
-    url=$(grep -o "https://dl.google.com/dl/android/aosp/${device}-ota-[a-zA-Z0-9.\-]*\.zip" "$page_file" 2>/dev/null | tail -1)
-  fi
-
+  # 从 releases 页面提取最新版本号 (格式 YYYYMMDDNN)
+  local version
+  version=$(grep -oP 'href=#\K\d{10}(?=>)' "$page_file" | head -1)
   rm -f "$page_file"
 
-  if [ -n "$url" ]; then
-    echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): 从 Google OTA 页面找到 URL: $(basename "$url")"
-    echo "$url"
+  if [ -n "$version" ]; then
+    echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): GrapheneOS 最新版本: $version"
+    echo "$version"
     return 0
   else
-    echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): 在页面中未找到 ${device} 的 OTA 链接（可能被反爬或页面结构变更）"
+    echo >&2 "$(date '+%Y-%m-%d %H:%M:%S'): 未找到 GrapheneOS 版本号"
     return 1
   fi
 }
 
 # ============================================================
-# 版本检测：从 Google OTA 页面或 devices.json 获取 Pixel OTA URL
+# 版本检测：从 GrapheneOS releases 页面获取 OTA 版本
 # ============================================================
+# GrapheneOS OTA zip 格式: {device}-ota-{version}.zip
+# 版本号格式: YYYYMMDDNN (如 2026050900)
+# 源: https://releases.grapheneos.org/
 
 function findLatestVersion() {
   checkMandatoryVariable DEVICE_ID
@@ -256,90 +241,24 @@ function findLatestVersion() {
   if [[ "$MAGISK_VERSION" == 'latest' ]] || [[ "$MAGISK_VERSION" == 'auto' ]]; then
     MAGISK_VERSION=$(curl --fail -sL -I -o /dev/null -w '%{url_effective}' \
       https://github.com/topjohnwu/Magisk/releases/latest | sed 's/.*\/tag\///;')
-    # 规范化：确保以 v 开头
     [[ "$MAGISK_VERSION" != v* ]] && MAGISK_VERSION="v${MAGISK_VERSION}"
   fi
   print "Magisk 版本: $MAGISK_VERSION"
 
-  # --------------- Pixel OTA URL 获取 ---------------
-  # 策略（参照 auto_ota_manual_patch.sh）：
-  # 1. 直接抓取 Google OTA 页面（curl + TOS cookie）获取完整 OTA URL（含 SHA）
-  # 2. 若失败，回退到 devices.json 构造 URL
-  # 3. 若 devices.json 也无 SHA，尝试 factory image
-
-  local scraped_url=""
+  # --------------- GrapheneOS OTA 版本检测 ---------------
   if [[ "$OTA_VERSION" == 'latest' ]]; then
-    scraped_url=$(fetchPixelOtaUrl "$DEVICE_ID") || true
-  else
-    scraped_url=$(fetchPixelOtaUrl "$DEVICE_ID" "$OTA_VERSION") || true
+    OTA_VERSION=$(fetchGrapheneOSVersion "$DEVICE_ID") || true
   fi
 
-  if [ -n "$scraped_url" ]; then
-    OTA_URL="$scraped_url"
-    OTA_TARGET=$(basename "$scraped_url" .zip)
-    # 从 target 中提取 OTA_VERSION: {device}-ota-{version}-{sha}
-    OTA_VERSION=$(echo "$OTA_TARGET" | sed 's/^[a-z0-9]*-ota-//; s/-[a-f0-9]\{8\}$//')
-    printGreen "通过 Google OTA 页面获取到: $OTA_TARGET"
-  else
-    printYellow "直接抓取 Google OTA 页面失败，回退到 devices.json..."
-
-    # --------------- OTA 版本检测 ---------------
-    if [[ "$OTA_VERSION" == 'latest' ]]; then
-      if [ -f "$DEVICES_JSON" ]; then
-        OTA_VERSION=$(python3 -c "
-import json, sys
-with open('$DEVICES_JSON') as f:
-    devices = json.load(f)
-device = devices.get('$DEVICE_ID', {})
-ver = device.get('latest_build', '')
-if not ver:
-    builds = device.get('builds', [])
-    if builds:
-        ver = builds[-1].get('build_id', '')
-sys.stdout.write(ver)
-" 2>/dev/null) || OTA_VERSION=""
-      fi
-    fi
-
-    if [[ -z "$OTA_VERSION" ]]; then
-      printRed "无法确定 $DEVICE_ID 的 OTA 版本。"
-      printRed "请通过 OTA_VERSION 环境变量指定版本，如 OTA_VERSION=AP4A.250205.002"
-      printRed "或在 devices.json 中配置该设备的版本信息。"
-      exit 1
-    fi
-
-    # --------------- 构造 OTA URL ---------------
-    local ota_sha=""
-    if [ -f "$DEVICES_JSON" ]; then
-      ota_sha=$(python3 -c "
-import json
-with open('$DEVICES_JSON') as f:
-    devices = json.load(f)
-builds = devices.get('$DEVICE_ID', {}).get('builds', [])
-sha = ''
-for b in builds:
-    if b.get('build_id') == '$OTA_VERSION':
-        sha = b.get('ota_sha', '')
-        break
-sys.stdout.write(sha)
-" 2>/dev/null) || ota_sha=""
-    fi
-
-    if [[ -n "$ota_sha" ]]; then
-      OTA_TARGET="${DEVICE_ID}-ota-${OTA_VERSION}-${ota_sha}"
-      OTA_URL="${OTA_BASE_URL}/${OTA_TARGET}.zip"
-    else
-      printYellow "devices.json 中未找到 $DEVICE_ID-$OTA_VERSION 的 SHA，尝试 factory image..."
-      OTA_TARGET="${DEVICE_ID}-factory-${OTA_VERSION}"
-      OTA_URL="${OTA_BASE_URL}/${OTA_TARGET}.zip"
-      printYellow "警告：将使用 factory image 而非 OTA zip。部分功能可能受限。"
-    fi
+  if [[ -z "$OTA_VERSION" ]]; then
+    printRed "无法确定 $DEVICE_ID 的 GrapheneOS 版本。"
+    printRed "请通过 OTA_VERSION 环境变量指定版本，如 OTA_VERSION=2026050900"
+    exit 1
   fi
 
-  # --------------- Magisk preinit 自动检测 ---------------
-  if [[ -z "$MAGISK_PREINIT_DEVICE" ]]; then
-    print "MAGISK_PREINIT_DEVICE 未设置，将在 OTA 下载后从 boot.img 自动检测"
-  fi
+  # 构造 OTA URL: {device}-ota_update-{version}.zip
+  OTA_TARGET="${DEVICE_ID}-ota_update-${OTA_VERSION}"
+  OTA_URL="${OTA_BASE_URL}/${OTA_TARGET}.zip"
 
   print "设备: $DEVICE_ID"
   print "版本: $OTA_VERSION"
@@ -367,9 +286,7 @@ function downloadAndroidDependencies() {
       printGreen "从预置目录复制了 OTA: $PRESEED_OTA_DIR/$OTA_TARGET.zip"
     else
       print "正在下载 $OTA_URL ..."
-      # dl.google.com 需要 TOS cookie，否则返回 "Sorry... automated queries"
-      curl -4 -sL -H "Cookie: devsite_wall_acks=nexus-ota-tos" \
-        -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+      curl -4 -sL \
         --retry 3 --retry-delay 5 \
         -o ".tmp/$OTA_TARGET.zip" "$OTA_URL"
     fi
@@ -886,19 +803,19 @@ function createReleaseIfNecessary() {
       changelog=$(curl -sL -X POST -H "Authorization: token $GITHUB_TOKEN" \
         -d "{
                 \"tag_name\": \"$OTA_VERSION\",
-                \"target_commitish\": \"master\"
+                \"target_commitish\": \"main\"
               }" \
         "https://api.github.com/repos/$GITHUB_REPO/releases/generate-notes" | jq -r '.body // empty')
-      changelog="更新到 Pixel $OTA_VERSION.\n\n$(echo "${changelog}" | sed ':a;N;$!ba;s/\n/\\n/g')"
+      changelog="更新到 GrapheneOS $OTA_VERSION.\n\n$(echo "${changelog}" | sed ':a;N;$!ba;s/\n/\\n/g')"
     else
       current_commit=$(git rev-parse --short HEAD)
-      changelog="更新到 Pixel $OTA_VERSION.\n\n由 ${src_repo}@${current_commit} 构建。"
+      changelog="更新到 GrapheneOS $OTA_VERSION.\n\n由 ${src_repo}@${current_commit} 构建。"
     fi
 
     response=$(curl -sL -X POST -H "Authorization: token $GITHUB_TOKEN" \
       -d "{
               \"tag_name\": \"$OTA_VERSION\",
-              \"target_commitish\": \"master\",
+              \"target_commitish\": \"main\",
               \"name\": \"$OTA_VERSION\",
               \"body\": \"${changelog}\"
             }" \
@@ -1232,7 +1149,7 @@ function generateKeys() {
   openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 \
     -out keys/ota.key
   openssl req -new -x509 -days 36500 -key keys/ota.key \
-    -out keys/ota.crt -subj '/CN=Rooted Pixel OTA/'
+    -out keys/ota.crt -subj '/CN=Rooted GrapheneOS OTA/'
   printGreen "密钥已生成到 keys/ 目录"
   printYellow "请安全保管这些密钥文件！"
 }
@@ -1273,7 +1190,7 @@ function printYellow() {
 # 主入口（source 时不执行）
 # ============================================================
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "rooted-pixel OTA 工具"
+  echo "rooted-graphene OTA 工具"
   echo ""
   echo "用法: source rooted-ota.sh && <函数名>"
   echo ""
@@ -1283,8 +1200,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   echo "  createAndReleaseRootedOta - 创建并发布 OTA"
   echo ""
   echo "环境变量:"
-  echo "  DEVICE_ID     - Pixel 设备代号（必填）"
-  echo "  OTA_VERSION   - Build ID（默认 latest，从 devices.json 读取）"
+  echo "  DEVICE_ID     - GrapheneOS 设备代号（必填）"
+  echo "  OTA_VERSION   - 版本号（默认 latest，格式如 2026050900）"
   echo "  KSU_VERSION   - KernelSU 版本（如 v3.2.4）"
   echo "  MAGISK_PREINIT_DEVICE - Magisk preinit 分区"
 fi
